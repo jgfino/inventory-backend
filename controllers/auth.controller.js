@@ -7,8 +7,6 @@ const jwt = require("jsonwebtoken");
 const User = require("../schema/user.schema");
 const nodemailer = require("nodemailer");
 const bcrypt = require("bcryptjs");
-const db = require("../schema");
-const Location = require("../schema/location.schema");
 
 /**
  * Authenticates a user with an email and password. If successful, returns a
@@ -88,7 +86,7 @@ exports.resetPassword = async (req, res) => {
   }
 
   const email = req.params.email;
-  const resetToken = req.query.token;
+  const resetToken = req.query.token ?? "";
 
   try {
     const user = await User.findOne({ email: email });

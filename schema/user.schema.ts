@@ -1,8 +1,9 @@
-var schemaUtils = require("./schemaUtils");
-var mongoose = require("mongoose");
-const bcrypt = require("bcryptjs");
+import { Document, model, Schema } from "mongoose";
+import User from "../types/User";
 
-const ThirdPartyAuth = schemaUtils.buildSchema({
+export interface UserDocument extends Document, User {}
+
+const ThirdPartyAuthSchema = new Schema({
   provider_name: {
     type: String,
     default: null,
@@ -17,7 +18,7 @@ const ThirdPartyAuth = schemaUtils.buildSchema({
   },
 });
 
-const UserSchema = new mongoose.Schema(
+const UserSchema = new Schema(
   {
     name: {
       type: String,
@@ -45,27 +46,23 @@ const UserSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
-    third_party_auth: [ThirdPartyAuth],
+    third_party_auth: [ThirdPartyAuthSchema],
   },
   {
     timestamps: true,
     toJSON: {
       transform: (doc, ret) => {
-        const {
-          __v,
-          _id,
-          encrypted_password,
-          password_reset_expiry,
-          password_reset_token,
-          ...object
-        } = doc.toObject();
-        object.id = _id;
-        return object;
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+        delete ret.encrypted_password;
+        delete ret.password_reset_token;
+        delete ret.password_reset_expiry;
       },
     },
   }
 );
 
-const User = mongoose.model("user", UserSchema);
+const User = model<User>("User", UserSchema);
 
 module.exports = User;

@@ -3,6 +3,8 @@
  */
 
 const User = require("../schema/user.schema");
+const Location = require("../schema/location.schema");
+const db = require("../schema");
 
 /**
  * Get a user's profile. If no id is specified, get the current user's profile.
@@ -22,9 +24,9 @@ exports.findOne = async (req, res) => {
 
     res.send(user);
   } catch (err) {
-    return res
-      .status(500)
-      .send({ message: `An error occured retrieving user with id=${id}.` });
+    return res.status(500).send({
+      message: `An error occured retrieving user with id=${id}: ${err.message}`,
+    });
   }
 };
 
@@ -40,6 +42,8 @@ exports.update = async (req, res) => {
     return res.status(400).send({ message: "Request cannot be empty." });
   }
 
+  const id = req.user.id;
+
   let newBody = {
     name: req.body.name,
     email: req.body.email,
@@ -47,7 +51,7 @@ exports.update = async (req, res) => {
   newBody = _.omitBy(newBody, _.isNil);
 
   try {
-    const user = await User.findByIdAndUpdate(req.user.id, newBody);
+    const user = await User.findByIdAndUpdate(id, newBody);
     if (!user) {
       return res
         .status(404)

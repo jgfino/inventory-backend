@@ -3,28 +3,28 @@
  * and users can only see locations which they own or are a member of.
  */
 
-const locations = require("../controllers/location.controller");
+import * as locations from "../controllers/location.controller";
 var router = require("express").Router();
 
 // Create a new location
-router.post("/", locations.create);
+router.post("/", locations.createLocation);
 
 // Get all locations; search by title or by shared
-router.get("/", locations.findAll);
+router.get("/", locations.findAllLocations);
 
 // Get a location by id
-router.get("/:id", locations.findOne);
+router.get("/:id", locations.findOneLocation);
 
 // Update a location by id
-router.put("/:id", locations.update);
+router.put("/:id", locations.updateLocation);
 
 // Add location members by id
-router.put(":/id/members", locations.modifyMembers);
+router.put("/:id/members", locations.modifyMembers);
 
 // Delete location members by id
-router.delete(":/id/members", locations.modifyMembers);
+router.delete("/:id/members", locations.modifyMembers);
 
 // Delete a location by id
-router.delete("/:id", locations.delete);
+router.delete("/:id", locations.deleteLocation);
 
 module.exports = router;

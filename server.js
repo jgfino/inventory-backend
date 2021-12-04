@@ -11,6 +11,9 @@ const locations = require("./routes/location.routes");
 const auth = require("./routes/auth.routes");
 const users = require("./routes/user.routes");
 
+var _ = require("lodash");
+global._ = _;
+
 var app = express();
 
 db.mongoose
@@ -25,7 +28,17 @@ db.mongoose
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
 app.use(passport.initialize());
+
+app.use(function (req, res, next) {
+  res.sendNotFoundError = (msg) => res.status(404).send({ error: msg });
+  res.sendInternalError = (msg) => res.status(500).send({ error: msg });
+  res.sendEmptyError = () =>
+    res.status(400).send({ error: "Request body cannot be empty." });
+
+  next();
+});
 
 const jwtAuth = passport.authenticate("jwt", { session: false });
 
