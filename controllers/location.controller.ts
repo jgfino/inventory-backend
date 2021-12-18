@@ -3,34 +3,23 @@
  */
 
 import LocationModel, {
-  LocationDocument,
   LocationPopulatedDocument,
-  LocationQuery,
-  PopulatedLocationQuery,
 } from "../schema/location.schema";
-import Mongoose from "mongoose";
 import { Request, Response } from "express";
-import _ from "lodash";
-import Location from "../types/Location";
+import _, { Dictionary } from "lodash";
 
-/**
- * Create a new Location owned by the requesting user.
- * @param req The request object.
- * @param res The response object.
- * @returns The newly created Location.
- */
 export const createLocation = async (req: Request, res: Response) => {
-  // Make sure the request has at least some body information
   if (!req.body) {
     return res.sendEmptyError();
   }
 
-  // Create a new location
+  console.log(req.user);
+
   const location = new LocationModel({
     name: req.body.name,
     iconName: req.body.iconName,
     colorName: req.body.colorName,
-    owner: req.user.id,
+    owner: req.user._id,
     shared: req.body.shared,
     members: req.body.members,
   });
@@ -45,38 +34,16 @@ export const createLocation = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Get all locations that the requesting user either owns or is a member of.
- * Can be filtered with query parameters "shared" and "search" to specify
- * only shared/not shared locations as well as perform full-text search on the
- * location name.
- * @param req The request object.
- * @param res The response object.
- * @returns The found Locations.
- */
-export const findAllLocations = async (req: Request, res: Response) => {
-  // Determine query parameters
+export const findLocations = async (req: Request, res: Response) => {
   const search = req.query.search ? String(req.query.search) : undefined;
-  const shared = req.query.shared;
-  const populate = req.query.populate;
+  const shared = req.query.shared ? Boolean(req.query.shared) : undefined;
 
-  const id = req.user.id;
+  const userId = req.user._id;
 
   try {
-    let query: LocationQuery | PopulatedLocationQuery = LocationModel.find()
-      .byAllowed(id)
-      .search(search);
-
-    if (shared && Boolean(shared)) {
-      query = query.byShared(Boolean(shared));
-    }
-
-    if (populate) {
-      query = query.populateAll();
-    }
-
-    const locations: LocationDocument[] | LocationPopulatedDocument[] =
-      await query;
+    const locations = await LocationModel.findAuthorized(userId)
+      .byShared(shared)
+      .searchByName(search);
 
     return res.send(locations);
   } catch (err: any) {
@@ -86,54 +53,34 @@ export const findAllLocations = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Get a location by id. Users can only access locations they own or are members
- * of.
- * @param req The request object.
- * @param res The response object.
- * @returns The found Location.
- */
-export const findOneLocation = async (req: Request, res: Response) => {
-  const id = req.params.id;
-  const populate = req.query.populate;
+export const findLocation = async (req: Request, res: Response) => {
+  const locationId = req.params.id;
+  const userId = req.user._id;
 
   try {
-    let query: LocationQuery | PopulatedLocationQuery =
-      LocationModel.findById(id).byAllowed(id);
-
-    if (populate) {
-      query = query.populateAll();
-    }
-
-    const location: LocationDocument | LocationPopulatedDocument = await query;
+    const location = await LocationModel.findByIdAuthorized(locationId, userId);
 
     if (!location) {
-      return res.sendNotFoundError(`Location with id=${id} not found.`);
+      return res.sendNotFoundError(`Location with id=${locationId} not found.`);
     }
+
     return res.send(location);
   } catch (err: any) {
     return res.sendInternalError(
-      `An error occured retrieving Location with id=${id}: ${err.message}`
+      `An error occured retrieving Location with id=${locationId}: ${err.message}`
     );
   }
 };
 
-/**
- * Update a location by id. Users can only update locations they own or are
- * members of. The fields which can be updated are name, iconName, colorName,
- * and shared.
- * @param req The request object.
- * @param res The response object.
- * @returns The old location.
- */
 export const updateLocation = async (req: Request, res: Response) => {
   if (!req.body) {
     return res.sendEmptyError();
   }
 
-  const id = req.params.id;
+  const locationId = req.params.id;
+  const userId = req.user._id;
 
-  let newBody: Partial<Location> = {
+  let newBody: Dictionary<String> = {
     name: req.body.name,
     iconName: req.body.iconName,
     colorName: req.body.colorName,
@@ -142,85 +89,71 @@ export const updateLocation = async (req: Request, res: Response) => {
   newBody = _.omitBy(newBody, _.isNil);
 
   try {
-    const oldLocation = await LocationModel.findById(id)
-      .byAllowed(id)
-      .update(newBody);
+    const oldLocation = await LocationModel.findByIdAuthorized(
+      locationId,
+      userId
+    ).update(newBody);
     if (!oldLocation) {
       return res.sendNotFoundError(
-        `Could not find Location with id ${id} to update.`
+        `Could not find Location with id ${locationId} to update.`
       );
     }
     return res.send(oldLocation);
   } catch (err: any) {
     return res.sendInternalError(
-      `Error updating Location with id=${id}: ${err.message}`
+      `Error updating Location with id=${locationId}: ${err.message}`
     );
   }
 };
 
-/**
- * Modifies the members of a location. A PUT request adds members, while a
- * DELETE request removes them.
- * @param req The request object.
- * @param res The response object.
- * @returns The old location.
- */
-export const modifyMembers = async (req: Request, res: Response) => {
+export const deleteMember = async (req: Request, res: Response) => {
   if (!req.body) {
     return res.sendEmptyError();
   }
 
-  const id = req.params.id;
-  const members = req.body.members ?? [];
-
-  const newData =
-    req.method == "PUT"
-      ? { $push: { members: { $each: members } } }
-      : req.method == "DELETE"
-      ? { $pull: { members: { $in: members } } }
-      : {};
+  const locationId = req.params.id;
+  const memberId = req.params.memberId;
+  const userId = req.user._id;
 
   try {
-    const oldLocation = await LocationModel.findById(id)
-      .byAllowed(id)
-      .update(newData);
-    if (!oldLocation) {
+    const location: LocationPopulatedDocument =
+      await LocationModel.findByIdAuthorized(locationId, userId);
+
+    if (!location) {
       return res.sendNotFoundError(
-        `Could not find Location with id ${id} to update.`
+        `Could not find Location with id ${locationId} to update.`
       );
     }
-    res.send(oldLocation);
+
+    await location.removeMember(memberId);
+    res.send(location);
   } catch (err: any) {
     res.sendInternalError(
-      `Error updating Location with id=${id}: ${err.message}`
+      `Error updating Location with id=${locationId}: ${err.message}`
     );
   }
 };
 
-/**
- * Delete a location by id. Users can only delete locations that they own.
- * @param req The request object.
- * @param res The response object.
- * @returns The old location.
- */
 export const deleteLocation = async (req: Request, res: Response) => {
-  const id = req.params.id;
+  const locationId = req.params.id;
+  const userId = req.user._id;
 
   try {
-    const oldLocation = await LocationModel.findById(id)
-      .byAllowed(id)
-      .deleteOne();
+    const oldLocation = await LocationModel.findByIdAuthorized(
+      locationId,
+      userId
+    ).deleteOne();
 
     if (!oldLocation) {
       return res.sendNotFoundError(
-        `Could not find Location with id ${id} to delete.`
+        `Could not find Location with id ${locationId} to delete.`
       );
     }
 
     res.send(oldLocation);
   } catch (err: any) {
     res.sendInternalError(
-      `Error deleting Location with id=${id}: ${err.message}`
+      `Error deleting Location with id=${locationId}: ${err.message}`
     );
   }
 };

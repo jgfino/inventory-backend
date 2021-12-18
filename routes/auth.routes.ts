@@ -17,4 +17,4 @@ router.post("/forgot/:email", auth.forgotPassword);
 // Reset password
 router.post("/reset/:email", auth.resetPassword);
 
-module.exports = router;
+export default router;

@@ -1,14 +1,15 @@
 import { ObjectId } from "mongoose";
-import User from "./User";
+import { BaseUser } from "./User";
 
-/**
- * Represents an inventory location.
- */
-export default interface Location {
+export interface BaseLocation {
+  _id: ObjectId;
   name: string;
   iconName: string;
   colorName: string;
-  owner: ObjectId | User;
+  owner: ObjectId | BaseUser;
   shared: boolean;
-  members: ObjectId[] | User[];
+  members: ObjectId[] | BaseUser[];
+  itemCount: number;
 }
+
+export interface Location extends BaseLocation {}
