@@ -33,17 +33,52 @@ export interface User extends BaseUser {
   email_verified: boolean;
 
   /**
-   * The user's encrypted password.
+   * The user's phone number.
    */
-  encrypted_password: string;
+  phone: string;
 
   /**
-   * The user's password reset token, if applicable.
+   * Whether the user has verified their phone number.
    */
-  password_reset_token: string | null;
+  phone_verified: boolean;
 
   /**
-   * When the user's password reset token expires, if applicable.
+   * The 6 digit code used to verify a user's email/phone number. Also used
+   * for 2FA.
    */
-  password_reset_expiry: Date | null;
+  account_verification_code?: {
+    code: string;
+    mode: "email" | "phone" | "2FA";
+  };
+
+  /**
+   * When the user's account verification code expires, if applicable
+   */
+  account_verification_expiry?: Date;
+
+  /**
+   * Whether the user has 2FA enabled
+   */
+  mfa_enabled: boolean;
+
+  /**
+   * The user's password.
+   */
+  password: string;
+
+  /**
+   * The user's refresh token secret. A user can only have one at a time to prevent
+   * logins on multiple devices. This may be changed in the future
+   */
+  refresh_token_secret: string;
+
+  /**
+   * The user's 6 digit password reset code, if applicable.
+   */
+  password_reset_code?: string;
+
+  /**
+   * When the user's password reset code expires, if applicable.
+   */
+  password_reset_expiry?: Date;
 }

@@ -1,7 +1,7 @@
 declare global {
   namespace Express {
     interface User {
-      _id: String;
+      _id?: String;
       email: String;
     }
     interface Response {
@@ -14,7 +14,7 @@ declare global {
 
 require("dotenv").config();
 
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 
 import passport from "./passport/setup";
 import mongoose from "mongoose";
@@ -25,8 +25,10 @@ import InvitationModel from "./schema/invitation.schema";
 
 import locations from "./routes/location.routes";
 import auth from "./routes/auth.routes";
-// import users from "./routes/user.routes";
+import users from "./routes/user.routes";
+import profiles from "./routes/profile.routes";
 import invitations from "./routes/invitation.routes";
+import ErrorResponse from "./error/ErrorResponse";
 
 var _ = require("lodash");
 global._ = _;
@@ -67,10 +69,64 @@ app.use(function (req, res, next) {
 
 const jwtAuth = passport.authenticate("jwt", { session: false });
 
-app.use("/api/auth", auth);
-// app.use("/api/users", jwtAuth, users);
-app.use("/api/locations", jwtAuth, locations);
-app.use("/api/invitations", jwtAuth, invitations);
+app.use("/api/v1/auth", auth);
+app.use("/api/v1/profile", jwtAuth, profiles);
+app.use("/api/v1/users", jwtAuth, users);
+app.use("/api/v1/locations", jwtAuth, locations);
+app.use("/api/v1/invitations", jwtAuth, invitations);
+
+app.all("*", (req, res, next) => {
+  return next(
+    new ErrorResponse("route-not-found", 404, `Can't find ${req.originalUrl}`)
+  );
+});
+
+app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+  let error: ErrorResponse;
+
+  if (err instanceof mongoose.Error) {
+    switch (true) {
+      case err instanceof mongoose.Error.ValidationError:
+        const messages: string[] = [];
+        const errors = (err as mongoose.Error.ValidationError).errors;
+
+        Object.values(errors).forEach((e) => {
+          if (e instanceof mongoose.Error.ValidatorError) {
+            messages.push(e.properties.message);
+          } else {
+            messages.push(e.message);
+          }
+        });
+
+        error = new ErrorResponse("database-error", 400, messages.join(", "));
+        break;
+      default:
+        error = new ErrorResponse(
+          "database-error",
+          500,
+          "An unknown database error occured."
+        );
+        break;
+    }
+  } else if (!(err instanceof ErrorResponse)) {
+    error = new ErrorResponse(
+      "database-error",
+      500,
+      "An unknown database error occured."
+    );
+  } else {
+    error = err;
+  }
+
+  console.error(err);
+
+  res.status(error.statusCode).json({
+    name: error.name,
+    statusCode: error.statusCode,
+    message: error.message,
+    detail: error.detail,
+  });
+});
 
 const PORT = 8080;
 app.listen(PORT, "localhost", () => {

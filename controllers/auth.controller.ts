@@ -1,129 +1,143 @@
 /**
- * Defines auth operations
+ * Authentication methods for user registering, login, password management
  */
 
-import passport from "passport";
-import UserModel, { UserDocument } from "../schema/user.schema";
-import nodemailer from "nodemailer";
-import bcrypt from "bcryptjs";
-import { NextFunction, Request, Response } from "express";
+import UserModel from "../schema/user.schema";
+import { catchAsync } from "../error/errorHandling";
+import { sendMail } from "../nodemailer/mailer";
+import { ForgotPasswordEmailTemplate } from "../nodemailer/templates.nodemailer";
+import { sendSMS } from "../twilio/sms";
+import validator from "validator";
+import {
+  ForgotPasswordTextTemplate,
+  MFATemplate,
+} from "../twilio/templates.twilio";
+import DatabaseErrors from "../error/errors/database.errors";
+import AuthErrors from "../error/errors/auth.errors";
 
-export const login = (req: Request, res: Response, next: NextFunction) => {
-  passport.authenticate(
-    "local",
-    { session: false },
-    (err, user: UserDocument, info) => {
-      if (err || !user) {
-        return next(err);
-      }
-
-      // @ts-ignore
-      req.logIn(user, { session: false }, async (error) => {
-        if (error) return next(error);
-        return res.json({
-          id: user._id,
-          email: user.email,
-          token: user.generateJWT(),
-        });
-      });
-    }
-  )(req, res, next);
-};
-
-export const register = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  try {
-    const { password, ...user } = req.body;
-    const newUser = new UserModel({ encrypted_password: password, ...user });
-    await newUser.save();
-
-    return res.json({
-      id: newUser._id,
-      email: newUser.email,
-      token: newUser.generateJWT(),
-    });
-  } catch (err: any) {
-    return res.sendInternalError(
-      `An error occured registering new user: ${err.message}`
-    );
-  }
-};
-
-export const resetPassword = async (req: Request, res: Response) => {
-  if (!req.body.password) {
-    return res.sendEmptyError();
-  }
-
-  const email = req.params.email;
-  const resetToken = req.query.token ? String(req.query.token) : "";
+/**
+ * Login a user, generating a new refresh token and 1 hr JWT.
+ * @param req The request object.
+ * @param res The response object.
+ * @param next The next function.
+ */
+export const login = catchAsync(async (req, res, next) => {
+  const emailOrPhone = req.body.emailOrPhone;
   const password = req.body.password;
 
-  try {
-    const user = await UserModel.findOne({ email: email });
-
-    if (!user) {
-      return res.sendNotFoundError(
-        "A user with this email address does not exist."
-      );
-    }
-
-    await user.resetPassword(resetToken, password);
-
-    res.send({
-      message: `Password updated successfully for user with email: ${email}`,
-    });
-  } catch (err: any) {
-    return res.sendInternalError(
-      `An error occured resetting the password: ${err}`
-    );
+  if (!emailOrPhone || !password) {
+    return next(DatabaseErrors.INVALID_FIELD());
   }
-};
 
-export const forgotPassword = async (req: Request, res: Response) => {
-  const email = req.params.email;
+  const user = await UserModel.findByEmailOrPhone(emailOrPhone);
 
-  try {
-    const user = await UserModel.findOne({ email: email });
-
-    if (!user) {
-      return res.sendNotFoundError(
-        "A user with this email address does not exist."
-      );
-    }
-
-    const resetToken = await user.getPasswordResetToken();
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        user: process.env.NODEMAIL_EMAIL,
-        pass: process.env.NODEMAIL_PASSWORD,
-      },
-    });
-
-    const options = {
-      from: process.env.NODEMAIL_EMAIL,
-      to: email,
-      subject: "Reset your Inventory password.",
-      text: `Follow this link to reset your password: Inventory://reset?token=${resetToken}`,
-    };
-
-    transporter.sendMail(options, (err, info) => {
-      if (err) {
-        return res.status(500).send({
-          message: `Error sending password reset email: ${err.message}`,
-        });
+  const passwordMatch = user.validatePassword(password);
+  if (!passwordMatch) {
+    return next(AuthErrors.INCORRECT_PASSWORD);
+  } else {
+    if (user.mfa_enabled) {
+      if (!req.body.code) {
+        const verifyCode = await user.getVerificationCode("2FA");
+        sendSMS(user.phone, MFATemplate(verifyCode));
+        return next(AuthErrors.MFA_NO_TOKEN);
       } else {
-        return res.send({
-          message: `Password reset email sent to ${email}`,
-        });
+        await user.verifyCode(req.body.code, "2FA");
       }
+    }
+    const tokens = await user.generateTokens();
+    return res.status(200).json({
+      message: "User logged in successfully",
+      ...tokens,
     });
-  } catch (err: any) {
-    return res.sendInternalError(
-      `Error sending forgot password request for user with email=${email}.`
-    );
   }
-};
+});
+
+/**
+ * Register a new user and log them in.
+ */
+export const register = catchAsync(async (req, res, next) => {
+  const { emailOrPhone, ...userData } = req.body;
+
+  if (!emailOrPhone) {
+    return next(DatabaseErrors.INVALID_FIELD());
+  }
+
+  if (validator.isEmail(emailOrPhone)) {
+    userData.email = emailOrPhone;
+  } else if (validator.isMobilePhone(emailOrPhone)) {
+    userData.phone = emailOrPhone;
+  }
+
+  const newUser = new UserModel(userData);
+
+  await newUser.save();
+  const tokens = await newUser.generateTokens();
+  return res.status(200).json({
+    message: "User registered successfully",
+    ...tokens,
+  });
+});
+
+/**
+ * Refresh a user's tokens using their access and refresh tokens.
+ */
+export const refreshToken = catchAsync(async (req, res, next) => {
+  if (!req.body.refreshToken) {
+    return next(DatabaseErrors.INVALID_FIELD("Must provide refresh token"));
+  }
+
+  if (!req.body.accessToken) {
+    return next(DatabaseErrors.INVALID_FIELD("Must provide access token"));
+  }
+
+  const tokens = await UserModel.refreshTokens(
+    req.body.accessToken,
+    req.body.refreshToken
+  );
+
+  return res.status(200).json({
+    message: "Tokens refreshed successfully",
+    ...tokens,
+  });
+});
+
+/**
+ * Reset a user's password. Returns new access/refresh tokens.
+ */
+export const resetPassword = catchAsync(async (req, res, next) => {
+  if (!req.body.password) {
+    return next(DatabaseErrors.INVALID_FIELD("Must provide new password"));
+  }
+
+  const emailOrPhone = req.params.emailOrPhone;
+  const resetCode = (req.query.code as string) ?? "";
+  const password = req.body.password;
+
+  const user = await UserModel.findByEmailOrPhone(emailOrPhone);
+  const tokens = await user.resetPassword(resetCode, password);
+
+  res.status(200).json({
+    message: `Password updated successfully`,
+    ...tokens,
+  });
+});
+
+/**
+ * Set a user's password reset code and notify them by email or text
+ */
+export const forgotPassword = catchAsync(async (req, res, next) => {
+  const emailOrPhone = req.params.emailOrPhone;
+  const user = await UserModel.findByEmailOrPhone(emailOrPhone);
+
+  const resetCode = await user.getPasswordResetCode();
+
+  if (validator.isEmail(emailOrPhone)) {
+    await sendMail(emailOrPhone, ForgotPasswordEmailTemplate(resetCode));
+  } else if (validator.isMobilePhone(emailOrPhone)) {
+    await sendSMS(emailOrPhone, ForgotPasswordTextTemplate(resetCode));
+  }
+
+  res.status(200).json({
+    message: `Password reset code sent to ${emailOrPhone}`,
+  });
+});

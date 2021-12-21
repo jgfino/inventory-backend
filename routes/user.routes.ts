@@ -1,20 +1,13 @@
-// /**
-//  * Defines routes to access and modify user information.
-//  */
+/**
+ * Defines routes to access and modify user information.
+ */
 
-// const users = require("../controllers/user.controller");
-// var router = require("express").Router();
+import * as users from "../controllers/user.controller";
+import express from "express";
 
-// // Update user profile.
-// router.put("/:id", users.update);
+const router = express.Router();
 
-// // Get the current user's profile
-// router.get("/", users.findOne);
+// Get a user
+router.get("/:id", users.getUser);
 
-// // View a user profile
-// router.get("/:id", users.findOne);
-
-// // Delete user profile and associated locations.
-// router.delete("/", users.delete);
-
-// export default router;
+export default router;

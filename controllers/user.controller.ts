@@ -1,92 +1,23 @@
-// /**
-//  * Defines CRUD operations for Users and performs security checks.
-//  */
+/**
+ * Methods for logged-in users
+ */
 
-// import User from "../schema/user.schema";
-// import Location from "../schema/location.schema";
+import UserModel from "../schema/user.schema";
+import { catchAsync } from "../error/errorHandling";
+import HttpError from "../error/ErrorResponse";
+import AuthErrors from "../error/errors/auth.errors";
+import DatabaseErrors from "../error/errors/database.errors";
 
-// /**
-//  * Get a user's profile. If no id is specified, get the current user's profile.
-//  * @param {*} req The request object.
-//  * @param {*} res The response object.
-//  * @returns The requested user.
-//  */
-// exports.findOne = async (req, res) => {
-//   const id = req.params.id ?? req.user._id;
+/**
+ * Get a user's public information
+ */
+export const getUser = catchAsync(async (req, res, next) => {
+  const userId = req.params.id;
+  const profile = await UserModel.getUserProfile(userId);
 
-//   try {
-//     const user = await User.findById(id);
+  if (!profile) {
+    return next(DatabaseErrors.NOT_FOUND("A user with this id was not found."));
+  }
 
-//     if (!user) {
-//       return res.status(404).send({ message: `User with id=${id} not found.` });
-//     }
-
-//     res.send(user);
-//   } catch (err) {
-//     return res.status(500).send({
-//       message: `An error occured retrieving user with id=${id}: ${err.message}`,
-//     });
-//   }
-// };
-
-// /**
-//  * Updates the requesting user's profile. Fields which can be updated are name
-//  * and email.
-//  * @param {*} req The request object.
-//  * @param {*} res The response object.
-//  * @returns A status message.
-//  */
-// exports.update = async (req, res) => {
-//   if (!req.body) {
-//     return res.status(400).send({ message: "Request cannot be empty." });
-//   }
-
-//   const id = req.user._id;
-
-//   let newBody = {
-//     name: req.body.name,
-//     email: req.body.email,
-//   };
-//   newBody = _.omitBy(newBody, _.isNil);
-
-//   try {
-//     const user = await User.findByIdAndUpdate(id, newBody);
-//     if (!user) {
-//       return res
-//         .status(404)
-//         .send({ message: `Could not find user with id=${id} to update.` });
-//     }
-//     res.send({ message: `User with id=${id} updated successfully.` });
-//   } catch (err) {
-//     return res
-//       .status(500)
-//       .send({ message: `Error updating user with id=${id}.` });
-//   }
-// };
-
-// /**
-//  * Delete the current user, and delete any locations they own as well as remove
-//  * membership in any shared containers
-//  * @param {*} req The request object.
-//  * @param {*} res The response object.
-//  */
-// exports.delete = async (req, res) => {
-//   const id = req.user._id;
-//   const session = await db.mongoose.startSession();
-
-//   try {
-//     await session.withTransaction(async () => {
-//       await User.findByIdAndDelete(id);
-//       await Location.deleteMany({ owner: id });
-//       await Location.updateMany({ members: id }, { $pull: { members: id } });
-//     });
-
-//     res.send({ message: `User with id=${id} deleted successfully.` });
-//   } catch (err) {
-//     res.status(500).send({
-//       message: `Error deleting User with id=${id}: ${err.message}`,
-//     });
-//   } finally {
-//     await session.endSession();
-//   }
-// };
+  res.status(200).send(profile);
+});
