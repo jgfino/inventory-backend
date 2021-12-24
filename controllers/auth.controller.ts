@@ -3,7 +3,7 @@
  */
 
 import UserModel from "../schema/user.schema";
-import { catchAsync } from "../error/errorHandling";
+import { catchAsync } from "../error/catchAsync";
 import { sendMail } from "../nodemailer/mailer";
 import { ForgotPasswordEmailTemplate } from "../nodemailer/templates.nodemailer";
 import { sendSMS } from "../twilio/sms";
@@ -68,9 +68,7 @@ export const register = catchAsync(async (req, res, next) => {
     userData.phone = emailOrPhone;
   }
 
-  const newUser = new UserModel(userData);
-
-  await newUser.save();
+  const newUser = await UserModel.create(userData);
   const tokens = await newUser.generateTokens();
   return res.status(200).json({
     message: "User registered successfully",

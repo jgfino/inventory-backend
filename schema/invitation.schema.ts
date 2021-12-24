@@ -1,58 +1,62 @@
-import { Document, model, Schema, Types } from "mongoose";
-import BaseModel, { modelDefaults } from "../types/BaseModel";
-import BaseQuery from "../types/BaseQuery";
-import BaseQueryHelper from "../types/BaseQueryHelper";
+import { Document, Model, model, Schema, Types } from "mongoose";
 import Invitation from "../types/Invitation";
 import { BaseLocation } from "../types/Location";
 import { BaseUser } from "../types/User";
-import { LocationDocument } from "./location.schema";
-import { UserDocument } from "./user.schema";
 import LocationModel from "./location.schema";
+import DatabaseErrors from "../error/errors/database.errors";
+import QueryChain from "./QueryChain";
 
 interface InvitationBaseDocument extends Document, Omit<Invitation, "_id"> {
+  /**
+   * Accept this invitation
+   */
   accept(): Promise<void>;
+
+  /**
+   * Decline this invitation
+   */
   decline(): Promise<void>;
+
+  /**
+   * Revoke this invitation
+   */
+  revoke(): Promise<void>;
 }
 
-export interface InvitationDocument extends InvitationBaseDocument {
-  to: UserDocument["_id"];
-  from: UserDocument["_id"];
-  location: LocationDocument["_id"];
-}
+interface InvitationDocument extends InvitationBaseDocument {}
 
-export interface InvitationPopulatedDocument extends InvitationBaseDocument {
-  to: BaseUser;
-  from: BaseUser;
-  location: BaseLocation;
-}
-
-export type InvitationQuery = BaseQuery<
-  InvitationPopulatedDocument,
+export type InvitationQuery = QueryChain<
+  InvitationDocument,
   InvitationQueryHelpers
 >;
 type InvitationQueryHelpers = {};
 
 interface InvitationModel
-  extends BaseModel<InvitationDocument, InvitationQueryHelpers> {
+  extends Model<InvitationDocument, InvitationQueryHelpers> {
   findTo(user: String): InvitationQuery;
   findFrom(user: String): InvitationQuery;
 }
 
+//#region Schema
+
+/**
+ * Invitation schema definition
+ */
 const InvitationSchema = new Schema<InvitationDocument, InvitationModel>(
   {
     to: {
-      type: Types.ObjectId,
-      required: true,
+      type: Schema.Types.ObjectId,
+      required: [true, "Invitation recipient required"],
       ref: "User",
     },
     from: {
-      type: Types.ObjectId,
-      required: true,
+      type: Schema.Types.ObjectId,
+      required: [true, "Invitation sender required"],
       ref: "User",
     },
     location: {
-      type: Types.ObjectId,
-      required: true,
+      type: Schema.Types.ObjectId,
+      required: [true, "Invitation location required"],
       ref: "Location",
     },
     message: {
@@ -74,43 +78,55 @@ const InvitationSchema = new Schema<InvitationDocument, InvitationModel>(
   }
 );
 
-InvitationSchema.methods.accept = async function () {
-  const location = await LocationModel.findById(this.location);
+//#endregion
 
-  if (!location) {
-    throw "No location found";
-  }
-
-  await location.addMember(this.to);
-  await this.delete();
-};
-
-InvitationSchema.methods.decline = async function () {
-  await this.delete();
-};
-
-InvitationSchema.statics.findTo = async function (user: String) {
-  return this.find({ to: user });
-};
-
-InvitationSchema.statics.findFrom = async function (user: String) {
-  return this.find({ from: user });
-};
-
-InvitationSchema.statics.getAuthFilter = function (user: String) {
-  return {
-    $or: [{ to: user }, { from: user }],
-  };
-};
-
-InvitationSchema.statics.findByIdAuthorized = modelDefaults.findByIdAuthorized;
-InvitationSchema.statics.findAuthorized = modelDefaults.findAuthorized;
+//#region Middleware
 
 InvitationSchema.pre("find", function () {
   this.populate("to", "_id name photoUrl")
     .populate("from", "_id name photoUrl")
     .populate("location");
 });
+
+//#endregion
+
+//#region Static methods
+
+// Find invitations sent to the given user
+InvitationSchema.statics.findTo = async function (user: string) {
+  //return this.find({ to: user });
+};
+
+// Find invitations sent from the given user
+InvitationSchema.statics.findFrom = async function (user: String) {
+  //return this.find({ from: user });
+};
+
+//#endregion
+
+//#region Document methods
+
+// Accept this invitation
+InvitationSchema.methods.accept = async function () {
+  const location = await LocationModel.findById(this.location);
+
+  if (!location) {
+    return Promise.reject(
+      DatabaseErrors.NOT_FOUND("Could not find Invitation to accept.")
+    );
+  }
+
+  // Add the member to the location
+  //await location.addMember(this.to);
+
+  // Delete this invitation
+  await this.delete();
+};
+
+// Decline this invitation
+InvitationSchema.methods.decline = async function () {
+  await this.delete();
+};
 
 export default model<InvitationDocument, InvitationModel>(
   "Invitation",

@@ -1,42 +1,34 @@
-import { Document, FilterQuery, Model, model, Schema, Types } from "mongoose";
-import BaseModel, { modelDefaults } from "../types/BaseModel";
-import BaseQuery from "../types/BaseQuery";
-import BaseQueryHelper from "../types/BaseQueryHelper";
+import { model, Schema, Types } from "mongoose";
 import { Location } from "../types/Location";
-import { BaseUser } from "../types/User";
-import { UserDocument } from "./user.schema";
+import InvitationModel from "./invitation.schema";
+import DatabaseErrors from "../error/errors/database.errors";
+import ErrorResponse from "../error/ErrorResponse";
+import QueryChain from "./QueryChain";
+import AuthorizableModel from "./AuthorizableModel";
 
-interface LocationBaseDocument extends Document, Omit<Location, "_id"> {
-  addMember(id: string): Promise<void>;
-  removeMember(id: string): Promise<void>;
-}
+//#region Types
 
-export interface LocationDocument extends LocationBaseDocument {
-  owner: UserDocument["_id"];
-  members: UserDocument["_id"][];
-  invitedMembers: UserDocument["_id"][];
-}
-
-export interface LocationPopulatedDocument extends LocationBaseDocument {
-  owner: BaseUser;
-  members: BaseUser[];
-  invitedMembers: BaseUser[];
-}
-
-export type LocationQuery = BaseQuery<
-  LocationPopulatedDocument,
-  LocationQueryHelpers
->;
+type LocationQuery = QueryChain<Location, LocationQueryHelpers>;
 
 interface LocationQueryHelpers {
   searchByName(text?: string): LocationQuery;
   byShared(shared?: boolean): LocationQuery;
 }
 
+/**
+ * The location model w/static methods
+ */
 interface LocationModel
-  extends BaseModel<LocationDocument, LocationQueryHelpers> {}
+  extends AuthorizableModel<Location, LocationQueryHelpers> {}
 
-const LocationSchema = new Schema<LocationDocument, LocationModel>(
+//#endregion
+
+//#region Schema definition
+
+/**
+ * Location schema definition
+ */
+const LocationSchema = new Schema<Location, LocationModel>(
   {
     name: {
       type: String,
@@ -51,7 +43,7 @@ const LocationSchema = new Schema<LocationDocument, LocationModel>(
       required: true,
     },
     owner: {
-      type: Types.ObjectId,
+      type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
@@ -66,18 +58,6 @@ const LocationSchema = new Schema<LocationDocument, LocationModel>(
         ref: "User",
       },
     ],
-    invitedMembers: [
-      {
-        type: Types.ObjectId,
-        required: true,
-        ref: "User",
-      },
-    ],
-    itemCount: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
   },
   {
     timestamps: true,
@@ -91,13 +71,9 @@ const LocationSchema = new Schema<LocationDocument, LocationModel>(
   }
 );
 
-LocationSchema.methods.addMember = async function (id: String) {
-  await this.update({ $push: { members: id } });
-};
+//#endregion
 
-LocationSchema.methods.removeMember = async function (id: String) {
-  await this.update({ $pull: { members: id } });
-};
+//#region Query helpers
 
 LocationSchema.query.searchByName = function (text?: string) {
   if (!text) return this;
@@ -109,24 +85,56 @@ LocationSchema.query.byShared = function (shared?: boolean) {
   return this.find({ shared: shared });
 };
 
-LocationSchema.statics.getAuthFilter = function (user: string) {
-  return {
-    $or: [{ owner: user }, { members: user }, { invitedMembers: user }],
-  };
+//#endregion
+
+//#region Static methods
+
+/**
+ * See if a user is authorized to view this location. Users are authorized if:
+ * - They are the owner of a location
+ * - They are a member of a location
+ * - They have been invited to a location
+ * @param authId The user id to check
+ */
+LocationSchema.statics.authorize = function (
+  authId: string,
+  cb: (err: ErrorResponse, query: LocationQuery) => void
+) {
+  // Get ids of locations this user has been invited to
+  InvitationModel.find()
+    .distinct("location")
+    .then((invitedLocationIds) => {
+      const authQuery = this.find({
+        $or: [
+          { owner: authId },
+          { members: authId },
+          { _id: { $in: invitedLocationIds } },
+        ],
+      });
+      cb(authId ? null : DatabaseErrors.NOT_AUTHORIZED, authQuery);
+    });
 };
 
-LocationSchema.statics.findByIdAuthorized = modelDefaults.findByIdAuthorized;
-LocationSchema.statics.findAuthorized = modelDefaults.findAuthorized;
+/**
+ * Safely create a new user document
+ * @param authId The user id to use
+ * @param data The new data to use when creating the document
+ */
+LocationSchema.statics.createAuthorized = async function (
+  authId: string,
+  data: any
+) {
+  return await this.create({
+    ...data,
+    owner: authId,
+  });
+};
 
-LocationSchema.pre("find", function (next) {
-  this.populate("owner", "_id name photoUrl").populate(
-    "members",
-    "_id name photoUrl"
-  );
-  next();
-});
+//#endregion
 
-export default model<LocationDocument, LocationModel>(
+const LocationModel = model<Location, LocationModel>(
   "Location",
   LocationSchema
 );
+
+export default LocationModel;

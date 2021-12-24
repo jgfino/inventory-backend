@@ -3,11 +3,6 @@
  */
 export interface BaseUser {
   /**
-   * The id of the User.
-   */
-  _id: string;
-
-  /**
    * The name/username of the User.
    */
   name: string;

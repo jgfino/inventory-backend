@@ -1,6 +1,4 @@
-import { Document, Model, model, Schema } from "mongoose";
-import BaseModel from "../types/BaseModel";
-import BaseQuery from "../types/BaseQuery";
+import { HydratedDocument, Model, model, Schema } from "mongoose";
 import { BaseUser, User } from "../types/User";
 import bcrypt from "bcryptjs";
 import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
@@ -20,10 +18,8 @@ type AuthJSON = {
   refreshToken: string;
 };
 
-/**
- * The document type for a user returned from the database w/document methods
- */
-export interface UserDocument extends Document, Omit<User, "_id"> {
+// Individual document instance methods for users
+interface UserInstanceMethods {
   /**
    * Determines if the given password is correct for this user.
    * @param password The password to check.
@@ -76,15 +72,9 @@ export interface UserDocument extends Document, Omit<User, "_id"> {
 }
 
 /**
- * The type returned when querying on users using query helpers
- */
-export type UserQuery = BaseQuery<UserDocument, UserQueryHelpers>;
-type UserQueryHelpers = {};
-
-/**
  * The user model type w/static methods
  */
-interface UserModel extends BaseModel<UserDocument, UserQueryHelpers> {
+interface UserModel extends Model<User, {}, UserInstanceMethods> {
   /**
    * Refreshes the tokens for the user identified by the given tokens
    * @param accessToken The user's access token
@@ -102,7 +92,9 @@ interface UserModel extends BaseModel<UserDocument, UserQueryHelpers> {
    * Find a user by email or password
    * @param emailOrPhone Email or phone number
    */
-  findByEmailOrPhone(emailOrPhone: string): Promise<UserDocument>;
+  findByEmailOrPhone(
+    emailOrPhone: string
+  ): Promise<HydratedDocument<User, UserInstanceMethods>>;
 }
 
 //#endregion
@@ -112,7 +104,7 @@ interface UserModel extends BaseModel<UserDocument, UserQueryHelpers> {
 /**
  * User schema definition
  */
-const UserSchema = new Schema<UserDocument, UserModel>(
+const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
   {
     name: {
       type: String,
@@ -187,7 +179,7 @@ const UserSchema = new Schema<UserDocument, UserModel>(
   {
     timestamps: true,
     toJSON: {
-      transform: (doc: UserDocument, ret: UserDocument) => {
+      transform: (doc, ret) => {
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
@@ -206,10 +198,7 @@ const UserSchema = new Schema<UserDocument, UserModel>(
 
 //#region Middleware
 
-async function saveOrUpdate(
-  this: UserDocument,
-  next: (err?: mongoose.NativeError) => void
-) {
+UserSchema.pre("save", function (next) {
   if (this.isModified("password")) {
     const hash = bcrypt.hashSync(this.password, 10);
     this.password = hash;
@@ -224,9 +213,7 @@ async function saveOrUpdate(
   }
 
   next();
-}
-
-UserSchema.pre("save", saveOrUpdate);
+});
 
 // Make sure the user always has a unique email or phone number
 UserSchema.pre("validate", async function (next) {
@@ -238,9 +225,9 @@ UserSchema.pre("validate", async function (next) {
     );
   }
 
-  const model = mongoose.models["User"];
-  let otherEmail: UserDocument[] = [];
-  let otherPhone: UserDocument[] = [];
+  const model = mongoose.models["User"] as UserModel;
+  let otherEmail: HydratedDocument<User, UserInstanceMethods>[] = [];
+  let otherPhone: HydratedDocument<User, UserInstanceMethods>[] = [];
 
   if (this.email) {
     otherEmail = await model
@@ -362,7 +349,7 @@ UserSchema.statics.getUserProfile = async function (id: string) {
 
 // Find a user by email or phone
 UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
-  let user: UserDocument;
+  let user: HydratedDocument<User, UserInstanceMethods>;
 
   if (!emailOrPhone) {
     return Promise.reject(AuthErrors.USER_NOT_FOUND);
@@ -525,6 +512,6 @@ UserSchema.methods.resetPassword = async function (
 //#endregion
 
 // Create the user model
-const UserModel = model<UserDocument, UserModel>("User", UserSchema);
+const UserModel = model<User, UserModel>("User", UserSchema);
 
 export default UserModel;

@@ -3,7 +3,7 @@
  */
 
 import UserModel from "../schema/user.schema";
-import { catchAsync } from "../error/errorHandling";
+import { catchAsync } from "../error/catchAsync";
 import HttpError from "../error/ErrorResponse";
 import AuthErrors from "../error/errors/auth.errors";
 import DatabaseErrors from "../error/errors/database.errors";

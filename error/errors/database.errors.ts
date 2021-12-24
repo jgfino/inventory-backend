@@ -24,6 +24,11 @@ const DatabaseErrors = {
     ),
   NOT_FOUND: (detail?: string) =>
     new ErrorResponse("not-found", 404, "Record not found", detail),
+  NOT_AUTHORIZED: new ErrorResponse(
+    "no-access",
+    403,
+    "You do not have permission to access this resource."
+  ),
 };
 
 export default DatabaseErrors;

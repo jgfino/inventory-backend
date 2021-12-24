@@ -1,15 +1,13 @@
-import { ObjectId } from "mongoose";
+import { ObjectId, Types } from "mongoose";
 import { BaseUser } from "./User";
 
 export interface BaseLocation {
-  _id: ObjectId;
   name: string;
   iconName: string;
   colorName: string;
-  owner: ObjectId | BaseUser;
+  owner: Types.ObjectId;
   shared: boolean;
-  members: ObjectId[] | BaseUser[];
-  itemCount: number;
+  members: Types.Array<Types.ObjectId>;
 }
 
 export interface Location extends BaseLocation {}

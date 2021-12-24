@@ -1,5 +1,5 @@
 import UserModel from "../schema/user.schema";
-import { catchAsync } from "../error/errorHandling";
+import { catchAsync } from "../error/catchAsync";
 import { sendMail } from "../nodemailer/mailer";
 import { VerifyEmailTemplate } from "../nodemailer/templates.nodemailer";
 import { sendSMS } from "../twilio/sms";

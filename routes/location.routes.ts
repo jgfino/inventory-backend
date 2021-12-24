@@ -6,54 +6,32 @@
 import * as locations from "../controllers/location.controller";
 var router = require("express").Router();
 
-/**
- * Create a new location
- *
- * POST /api/locations/
- *
- * Body: Location
- */
+// Create a location
 router.post("/", locations.createLocation);
 
-/**
- * Find all locations
- *
- * GET /api/locations?shared={true/false}&search={text}
- *
- * Query Params:
- * - shared: true to only receive shared locations, false for only personal
- * - search: text string to search location names
- */
-router.get("/", locations.findLocations);
+// Get all locations the current user owns, is a member of, or is invited to
+// Filter by name search or by shared/invited/member of
+// router.get("/", locations.findLocations);
 
-/**
- * Get a location by id
- *
- * GET /api/locations/:id
- */
-router.get("/:id", locations.findLocations);
+// Get a location
+router.get("/:id", locations.findLocation);
 
-/**
- * Update a location by id
- *
- * PUT /api/locations/:id
- *
- * Body: Location or partial Location
- */
-router.put("/:id", locations.updateLocation);
+// // Update a location
+// router.put("/:id", locations.updateLocation);
 
-/**
- * Delete a member from the location by id
- *
- * DELETE /api/locations/:id/members/:memberId
- */
-router.delete("/:id/members/:memberId", locations.deleteMember);
+// // Delete a location
+// router.delete("/:id");
 
-/**
- * Delete a location by id
- *
- * DELETE /api/locations/:id
- */
-router.delete("/:id", locations.deleteLocation);
+// // Get the members of a location
+// router.get("/:id/members");
+
+// // Add a member to the location
+// router.post("/:id/members/:memberId");
+
+// // Delete a member from the location
+// router.delete("/:id/members/:memberId");
+
+// // Get the users invited to a location
+// router.get("/:id/members/invited");
 
 export default router;

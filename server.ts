@@ -1,8 +1,7 @@
 declare global {
   namespace Express {
     interface User {
-      _id?: String;
-      email: String;
+      _id?: string;
     }
     interface Response {
       sendNotFoundError(msg: String): void;
@@ -118,7 +117,7 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     error = err;
   }
 
-  console.error(err);
+  console.log(err);
 
   res.status(error.statusCode).json({
     name: error.name,
