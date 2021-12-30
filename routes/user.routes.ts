@@ -9,11 +9,10 @@ const router = express.Router();
 
 /**
  * Get a user's public profile information. Public information includes:
- * - name
- * - id
- * - profile photo
- * - mutual locations, with preview population
+ * - id, name, photoUrl
+ * - Mutual locations
+ * - Owned items in mutual locations
  */
-router.get("/:id", users.getUser);
+router.get("/:id/profile", users.getUser);
 
 export default router;

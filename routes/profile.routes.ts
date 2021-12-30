@@ -8,31 +8,56 @@ import express from "express";
 
 const router = express.Router();
 
-// Get the currently logged-in user
-router.get("/", profile.getProfile);
+/**
+ * Get the currently logged-in user
+ */
+router.get("/");
 
-// Delete the currently logged-in user
+/**
+ * Get all profile information for the logged-in user. Including locations,
+ * items, invitations
+ */
+router.get("/profile", profile.getProfile);
+
+/**
+ * Delete the currently logged in user
+ */
 router.delete("/", profile.deleteProfile);
 
-// Update the currently logged-in user
+/**
+ * Update the currently logged in user. Updatable fields include name, email,
+ * phone
+ */
 router.put("/", profile.updateProfile);
 
-// Send a verfification email
+/**
+ * Send the logged in user a verification email
+ */
 router.post("/verify/send-email", profile.sendVerificationEmail);
 
-// Verify the user's email
+/**
+ * Verify the logged in user's email using a code
+ */
 router.post("/verify/email", profile.verifyEmail);
 
-// Send a verification text
+/**
+ * Send the logged in user a verification text
+ */
 router.post("/verify/send-text", profile.sendTextVerificationCode);
 
-// Verify the user's phone number
+/**
+ * Verify the logged in user's phone using a code
+ */
 router.post("/verify/phone", profile.verifyPhone);
 
-// Enable 2fa for the user
+/**
+ * Enable 2FA for the logged in user
+ */
 router.post("/2fa/enable", profile.enable2fa);
 
-// Disable 2fa for the user
+/**
+ * Disable 2FA for the logged in user
+ */
 router.post("/2fa/disable", profile.disable2fa);
 
 export default router;

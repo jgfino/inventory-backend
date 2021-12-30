@@ -62,6 +62,7 @@ const InvitationSchema = new Schema<Invitation, InvitationModel, {}>(
     toObject: { virtuals: true },
   }
 );
+InvitationSchema.plugin(require("mongoose-autopopulate"));
 
 //#endregion
 

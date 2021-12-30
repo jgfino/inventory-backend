@@ -1,23 +1,31 @@
-/**
- * Defines routes for user auth. These routes are not protected.
- */
-
 import * as auth from "../controllers/auth.controller";
-var router = require("express").Router();
+import express from "express";
 
-// Sign in a user
+const router = express.Router();
+
+/**
+ * Sign in a user
+ */
 router.post("/login", auth.login);
 
-// Register user
+/**
+ * Register a new user
+ */
 router.post("/register", auth.register);
 
-// Refresh tokens
+/**
+ * Refresh a user's tokens using an access and refresh token
+ */
 router.post("/token", auth.refreshToken);
 
-// Forgot password
+/**
+ * Send a password reset email/text
+ */
 router.post("/forgot/:emailOrPhone", auth.forgotPassword);
 
-// Reset password
+/**
+ * Reset a user's password using a token
+ */
 router.post("/reset/:emailOrPhone", auth.resetPassword);
 
 export default router;
