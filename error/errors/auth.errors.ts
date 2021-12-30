@@ -1,5 +1,8 @@
 import ErrorResponse from "../ErrorResponse";
 
+/**
+ * Custom authentication errors
+ */
 const AuthErrors = {
   JWT_EXPIRED: (detail?: string) =>
     new ErrorResponse("auth/jwt-expired", 401, "JWT token expired", detail),

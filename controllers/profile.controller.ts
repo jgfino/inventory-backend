@@ -134,12 +134,17 @@ export const deleteProfile = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Updates the current user
+ * Updates the current user. Updatable fields include email, phone, name.
  */
 export const updateProfile = catchAsync(async (req, res, next) => {
-  const newUser = req.body;
+  const body = req.body;
+  const newData = {
+    name: body.name,
+    email: body.email,
+    phone: body.phone,
+  };
   const user = await UserModel.findById(req.user._id);
-  user.set(newUser);
+  user.set(newData);
   await user.save();
   res.status(200).json({
     message: "User updated successfully",

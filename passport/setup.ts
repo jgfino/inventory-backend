@@ -1,7 +1,3 @@
-/**
- * Defines authorization methods with passportjs.
- */
-
 import passport from "passport";
 import { Strategy as JWTStrategy, StrategyOptions } from "passport-jwt";
 import { ExtractJwt } from "passport-jwt";

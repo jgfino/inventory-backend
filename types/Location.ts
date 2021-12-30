@@ -1,13 +1,28 @@
-import { ObjectId, Types } from "mongoose";
-import { BaseUser } from "./User";
+import { Types } from "mongoose";
+import TimestampType from "./TimestampType";
 
-export interface BaseLocation {
+/**
+ * Represents a Location which users can add items to.
+ */
+export interface Location extends TimestampType {
+  /**
+   * The name of the Location
+   */
   name: string;
+  /**
+   * The display icon for the Location
+   */
   iconName: string;
-  colorName: string;
+  /**
+   * The user id of the owner of the Location
+   */
   owner: Types.ObjectId;
-  shared: boolean;
+  /**
+   * The user ids of the members of the Location
+   */
   members: Types.Array<Types.ObjectId>;
+  /**
+   * The user ids of the members invited to this Location
+   */
+  invitedMembers: Types.Array<Types.ObjectId>;
 }
-
-export interface Location extends BaseLocation {}

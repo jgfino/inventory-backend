@@ -1,7 +1,7 @@
 declare global {
   namespace Express {
     interface User {
-      _id?: string;
+      _id: string;
     }
     interface Response {
       sendNotFoundError(msg: String): void;
@@ -14,6 +14,7 @@ declare global {
 require("dotenv").config();
 
 import express, { NextFunction, Request, Response } from "express";
+import cron from "node-cron";
 
 import passport from "./passport/setup";
 import mongoose from "mongoose";
@@ -21,12 +22,14 @@ import mongoose from "mongoose";
 import UserModel from "./schema/user.schema";
 import LocationModel from "./schema/location.schema";
 import InvitationModel from "./schema/invitation.schema";
+import ItemModel from "./schema/item.schema";
 
 import locations from "./routes/location.routes";
 import auth from "./routes/auth.routes";
 import users from "./routes/user.routes";
 import profiles from "./routes/profile.routes";
 import invitations from "./routes/invitation.routes";
+import items from "./routes/items.routes";
 import ErrorResponse from "./error/ErrorResponse";
 
 var _ = require("lodash");
@@ -40,6 +43,7 @@ const db = {
   users: UserModel,
   locations: LocationModel,
   invitations: InvitationModel,
+  items: ItemModel,
 };
 
 db.mongoose
@@ -73,6 +77,7 @@ app.use("/api/v1/profile", jwtAuth, profiles);
 app.use("/api/v1/users", jwtAuth, users);
 app.use("/api/v1/locations", jwtAuth, locations);
 app.use("/api/v1/invitations", jwtAuth, invitations);
+app.use("/api/v1/items", jwtAuth, items);
 
 app.all("*", (req, res, next) => {
   return next(
@@ -126,6 +131,60 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     detail: error.detail,
   });
 });
+
+// Cron job to delete expired invitations
+cron.schedule("1 0 * * *", async () => {
+  try {
+    console.log(`[${new Date()}] Deleting expired invitations...`);
+    const expiredInvitations = await InvitationModel.find({
+      expires: { $lte: new Date() },
+    });
+
+    await Promise.all(
+      expiredInvitations.map(async (doc) => {
+        return await doc.remove();
+      })
+    );
+
+    console.log(
+      `[${new Date()}] Removed ${expiredInvitations.length} expired invitations`
+    );
+  } catch (err) {
+    console.error("There was an error deleting expired invitations: ", err);
+  }
+});
+
+//TODO: cron job to notify expired.
+
+// Cron job to cleanup user codes that have expired
+cron.schedule("0 0 * * *", async () => {
+  try {
+    const expiredPassword = await UserModel.updateMany(
+      { password_reset_expiry: { $lt: new Date() } },
+      { $unset: { password_reset_expiry: "" } }
+    );
+    const expiredVerify = await UserModel.updateMany(
+      { account_verification_expiry: { $lt: new Date() } },
+      { $unset: { account_verification_expiry: "" } }
+    );
+
+    console.log(
+      `[${new Date()}] Removed ${
+        expiredPassword.modifiedCount
+      } expired password reset codes.`
+    );
+
+    console.log(
+      `[${new Date()}] Removed ${
+        expiredVerify.modifiedCount
+      } expired account verification codes.`
+    );
+  } catch (err) {
+    console.error("There was an error removing expired user tokens.");
+  }
+});
+
+mongoose.set("debug", true);
 
 const PORT = 8080;
 app.listen(PORT, "localhost", () => {

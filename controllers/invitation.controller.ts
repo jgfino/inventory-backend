@@ -1,94 +1,127 @@
 import { Request, Response } from "express";
-import { catchAsync } from "../error/catchAsync";
+import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
+import DatabaseErrors from "../error/errors/database.errors";
 import InvitationModel from "../schema/invitation.schema";
+import LocationModel from "../schema/location.schema";
 
-export const createInvitation = async (req: Request, res: Response) => {
-  if (!req.body) {
-    return res.sendEmptyError();
-  }
-
-  const invitation = new InvitationModel({
-    to: req.body.to,
-    from: req.user._id,
-    location: req.body.location,
-    message: req.body.message,
-  });
-
-  try {
-    const newInvitation = await invitation.save();
-    return res.send(newInvitation);
-  } catch (err: any) {
-    return res.sendInternalError(
-      `An error occured creating a new Invitation: ${err.message}`
+//TODO: change to authorized in schema
+export const createInvitation = authorizeAndCatchAsync(
+  async (req, res, next, locationModel) => {
+    const canAccessLocation = await locationModel.findOne(
+      { _id: req.body.location },
+      "_id"
     );
-  }
-};
 
-export const getInvitations = catchAsync(async (req, res, next) => {
-  const received = req.params.received;
-  const sent = req.params.sent;
-  const id = req.user._id;
+    if (!canAccessLocation) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "The specified location does not exist or you do not have permission to access it."
+        )
+      );
+    }
 
-  // let invitations: InvitationPopulatedDocument[];
-  // if (received) {
-  //   invitations = await InvitationModel.findTo(id);
-  // } else if (sent) {
-  //   invitations = await InvitationModel.findFrom(id);
-  // } else {
-  //   //invitations = await InvitationModel.findAuthorized(id);
-  // }
-  // return res.send(invitations);
-});
+    const invitation = await InvitationModel.create({
+      to: req.body.to,
+      from: req.user._id,
+      location: req.body.location,
+      message: req.body.message,
+    });
 
-export const getInvitation = async (req: Request, res: Response) => {
-  const invitationId = req.params.id;
-  const userId = req.user._id;
+    //TODO: send invitation notification
 
-  try {
-    // const invitation = await InvitationModel.findByIdAuthorized(
-    //   invitationId,
-    //   userId
-    // );
-    // return res.send(invitation);
-  } catch (err: any) {
-    return res.sendInternalError(
-      `An error occured retreiving Invitation with id=${invitationId}: ${err.message}`
+    res.status(200).send(invitation);
+  },
+  [LocationModel, "update"]
+);
+
+export const getInvitations = authorizeAndCatchAsync(
+  async (req, res, next, invitationModel) => {
+    const query = req.query;
+    const conditions: any = {};
+
+    query.to && (conditions.to = String(query.to));
+    query.from && (conditions.from = String(query.from));
+    query.location && (conditions.location = String(query.location));
+
+    const populate = query.full ? Boolean(query.full) : undefined;
+
+    let invitationQuery = invitationModel.find(conditions);
+    if (populate) {
+      invitationQuery = invitationQuery.populateDetails();
+    }
+
+    const invitations = await invitationQuery;
+    res.status(200).send(invitations);
+  },
+  [InvitationModel, "view"]
+);
+
+export const getInvitation = authorizeAndCatchAsync(
+  async (req, res, next, invitationModel) => {
+    const query = req.query;
+    const populate = query.full ? Boolean(query.full) : undefined;
+
+    let invitationQuery = invitationModel.findOne({ _id: req.params.id });
+    if (populate) {
+      invitationQuery = invitationQuery.populateDetails().findOne();
+    }
+
+    const invitation = await invitationQuery;
+    if (!invitation) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to view it."
+        )
+      );
+    }
+
+    res.status(200).send(invitation);
+  },
+  [InvitationModel, "view"]
+);
+
+export const acceptInvitation = authorizeAndCatchAsync(
+  async (req, res, next, invitationModel) => {
+    const invitation = await invitationModel.findOne({ _id: req.params.id });
+    if (!invitation) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "An invitation with this id does not exist or you do not have permission to view it."
+        )
+      );
+    }
+
+    //TODO: change to auth
+
+    await LocationModel.updateOne(
+      { _id: invitation.location },
+      { $addToSet: { members: req.user._id } }
     );
-  }
-};
+    await invitation.remove();
 
-export const acceptInvitation = async (req: Request, res: Response) => {
-  const invitationId = req.params.id;
-  const userId = req.user._id;
+    //TODO: notify acceptance
 
-  try {
-    // const invitation = await InvitationModel.findByIdAuthorized(
-    //   invitationId,
-    //   userId
-    // );
-    // await invitation.accept();
-    return res.send();
-  } catch (err: any) {
-    return res.sendInternalError(
-      `An error occured accepting Invitation with id=${invitationId}: ${err.message}`
-    );
-  }
-};
+    res.status(200).send({ message: "Invitation accepted successfully." });
+  },
+  [InvitationModel, "update"]
+);
 
-export const declineInvitation = async (req: Request, res: Response) => {
-  const invitationId = req.params.id;
-  const userId = req.user._id;
+export const declineInvitation = authorizeAndCatchAsync(
+  async (req, res, next, invitationModel) => {
+    const invitation = await invitationModel.findOne({ _id: req.params.id });
+    if (!invitation) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to view it."
+        )
+      );
+    }
 
-  try {
-    // const invitation = await InvitationModel.findByIdAuthorized(
-    //   invitationId,
-    //   userId
-    // );
-    // await invitation.decline();
-    return res.send();
-  } catch (err: any) {
-    return res.sendInternalError(
-      `An error occured rejecting Invitation with id=${invitationId}: ${err.message}`
-    );
-  }
-};
+    await invitation.remove();
+
+    //TODO: notify decline
+
+    res.status(200).send({ message: "Invitation declined successfully" });
+  },
+  [InvitationModel, "delete"]
+);

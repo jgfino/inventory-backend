@@ -27,6 +27,11 @@ export const ForgotPasswordEmailTemplate = (
   };
 };
 
+/**
+ * Email template for a email confirmation email.
+ * @param verifyCode The email verification code.
+ * @returns An email verification email template.
+ */
 export const VerifyEmailTemplate = (verifyCode: string): EmailTemplate => {
   return {
     subject: "Your Inventory Verification Code",

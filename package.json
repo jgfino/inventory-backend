@@ -2,15 +2,16 @@
   "name": "inventory-server",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "server.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "ts-node server.js"
+    "start": "ts-node server.ts"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "async": "^3.2.2",
+    "axios": "^0.24.0",
     "bcryptjs": "^2.4.3",
     "connect-mongo": "^4.6.0",
     "dotenv": "^10.0.0",
@@ -19,6 +20,8 @@
     "jsonwebtoken": "^8.5.1",
     "lodash": "^4.17.21",
     "mongoose": "^6.0.14",
+    "mongoose-autopopulate": "^0.16.0",
+    "node-cron": "^3.0.0",
     "nodemailer": "^6.7.2",
     "passport": "^0.5.0",
     "passport-jwt": "^4.0.0",
@@ -33,6 +36,7 @@
     "@types/jsonwebtoken": "^8.5.6",
     "@types/lodash": "^4.14.177",
     "@types/mongoose": "^5.11.97",
+    "@types/node-cron": "^3.0.0",
     "@types/nodemailer": "^6.4.4",
     "@types/passport": "^1.0.7",
     "@types/passport-jwt": "^3.0.6",

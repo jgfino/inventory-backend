@@ -1,7 +1,7 @@
 /**
- * The base type for a User.
+ * The full type for a User.
  */
-export interface BaseUser {
+export interface User {
   /**
    * The name/username of the User.
    */
@@ -11,12 +11,7 @@ export interface BaseUser {
    * The URL to the User's profile photo.
    */
   photoUrl: string;
-}
 
-/**
- * The full type for a User.
- */
-export interface User extends BaseUser {
   /**
    * The user's email.
    */

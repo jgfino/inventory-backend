@@ -1,5 +1,8 @@
 import ErrorResponse from "../ErrorResponse";
 
+/**
+ * Errors dealing with database/data retrieval
+ */
 const DatabaseErrors = {
   INVALID_FIELD: (detail?: string) =>
     new ErrorResponse(

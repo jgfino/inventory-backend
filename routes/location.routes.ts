@@ -6,32 +6,37 @@
 import * as locations from "../controllers/location.controller";
 var router = require("express").Router();
 
-// Create a location
+/**
+ * Create a location
+ */
 router.post("/", locations.createLocation);
 
-// Get all locations the current user owns, is a member of, or is invited to
-// Filter by name search or by shared/invited/member of
-// router.get("/", locations.findLocations);
+/**
+ * Get all locations. Filter by owner id. Search by location
+ * name. Populates owner field for display.
+ * Without a filter, returns locations a user is a member of or owns.
+ */
+router.get("/", locations.getLocations);
 
-// Get a location
-router.get("/:id", locations.findLocation);
+/**
+ * Get a location with the given id.
+ */
+router.get("/:id", locations.getLocation);
 
-// // Update a location
-// router.put("/:id", locations.updateLocation);
+/**
+ * Get a location with the given id. Populate owner, member, invited members
+ */
+router.get("/:id/details", locations.getLocation);
 
-// // Delete a location
-// router.delete("/:id");
+/**
+ * Update the location with the given id. Updatable fields include name,
+ * iconName, and colorName
+ */
+router.put("/:id", locations.updateLocation);
 
-// // Get the members of a location
-// router.get("/:id/members");
-
-// // Add a member to the location
-// router.post("/:id/members/:memberId");
-
-// // Delete a member from the location
-// router.delete("/:id/members/:memberId");
-
-// // Get the users invited to a location
-// router.get("/:id/members/invited");
+/**
+ * Delete the location with the given id.
+ */
+router.delete("/:id", locations.deleteLocation);
 
 export default router;

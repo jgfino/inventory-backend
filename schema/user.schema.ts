@@ -1,5 +1,5 @@
 import { HydratedDocument, Model, model, Schema } from "mongoose";
-import { BaseUser, User } from "../types/User";
+import { User } from "../types/User";
 import bcrypt from "bcryptjs";
 import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import LocationModel from "./location.schema";
@@ -9,16 +9,19 @@ import validator from "validator";
 import crypto from "crypto";
 import AuthErrors from "../error/errors/auth.errors";
 import DatabaseErrors from "../error/errors/database.errors";
+import ItemModel from "./item.schema";
 
 //#region Types
 
+/**
+ * The type returned from auth methods
+ */
 type AuthJSON = {
   id: string;
   accessToken: string;
   refreshToken: string;
 };
 
-// Individual document instance methods for users
 interface UserInstanceMethods {
   /**
    * Determines if the given password is correct for this user.
@@ -28,7 +31,7 @@ interface UserInstanceMethods {
   validatePassword(password: string): boolean;
 
   /**
-   * Generates (and updates) this user's access and refresh tokens.
+   * Generates new access and refresh tokens for this user.
    * @returns The new refresh and access tokens.
    */
   generateTokens(): Promise<AuthJSON>;
@@ -71,6 +74,23 @@ interface UserInstanceMethods {
   resetPassword(code: string, newPassword: string): Promise<AuthJSON>;
 }
 
+interface UserVirtuals {
+  /**
+   * The locations owned by this user
+   */
+  ownedLocations: Location[];
+
+  /**
+   * The locations this user is a member of
+   */
+  memberLocations: Location[];
+
+  /**
+   * The locations this user has been invited to
+   */
+  invitedLocations: Location[];
+}
+
 /**
  * The user model type w/static methods
  */
@@ -83,17 +103,20 @@ interface UserModel extends Model<User, {}, UserInstanceMethods> {
   refreshTokens(accessToken: string, refreshToken: string): Promise<AuthJSON>;
 
   /**
-   * Get a user's basic profile information.
-   * @param id The id of the user to find
-   */
-  getUserProfile(id: string): Promise<BaseUser>;
-
-  /**
    * Find a user by email or password
    * @param emailOrPhone Email or phone number
    */
   findByEmailOrPhone(
     emailOrPhone: string
+  ): Promise<HydratedDocument<User, UserInstanceMethods>>;
+
+  /**
+   * Get the private profile details for this user, including populated
+   * location membership
+   * @param id The user id to get.
+   */
+  getPrivateProfile(
+    id: string
   ): Promise<HydratedDocument<User, UserInstanceMethods>>;
 }
 
@@ -110,6 +133,7 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       type: String,
       trim: true,
       required: [true, "Name is required."],
+      maxlength: 100,
     },
     photoUrl: {
       type: String,
@@ -190,7 +214,9 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
         delete ret.password_reset_code;
         delete ret.password_reset_expiry;
       },
+      virtuals: true,
     },
+    toObject: { virtuals: true },
   }
 );
 
@@ -198,6 +224,7 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
 
 //#region Middleware
 
+// Hash password before saving
 UserSchema.pre("save", function (next) {
   if (this.isModified("password")) {
     const hash = bcrypt.hashSync(this.password, 10);
@@ -265,20 +292,67 @@ UserSchema.pre("validate", async function (next) {
 
 // Handle effects of deleting a user
 UserSchema.pre("remove", async function (next) {
+  // The operations to execute
+  const promises: Promise<any>[] = [];
+
   // Delete locations owned by this user
-  await LocationModel.remove({ owner: this._id }).exec();
+  const locations = await LocationModel.find({ owner: this._id });
+  locations.forEach((doc) => {
+    promises.push(doc.remove());
+  });
 
-  // Remove membership of this user in other locations
-  await LocationModel.updateMany({ $pull: { members: this._id } }).exec();
+  // Remove membership of this user in locations
+  promises.push(
+    LocationModel.updateMany(
+      { members: this._id },
+      { $pull: { members: this._id } }
+    ).exec()
+  );
 
-  // Remove invitations tied to this user
-  await InvitationModel.remove({
-    $or: [{ to: this._id }, { from: this._id }],
-  }).exec();
+  // Delete invitations sent by this user
+  const invitations = await InvitationModel.find({ from: this._id });
+  invitations.forEach((doc) => {
+    promises.push(doc.remove());
+  });
 
-  // Remove items tied to this user
+  // Delete items owned by this user
+  promises.push(ItemModel.deleteMany({ owner: this._id }).exec());
+
+  // Remove notification days for items for this user
+  ItemModel.updateMany(
+    { notificationDays: { $elemMatch: { user: this._id } } },
+    { $pull: { notificationDays: { user: this._id } } }
+  );
+
+  // Await async operations
+  await Promise.all(promises);
 
   next();
+});
+
+//#endregion
+
+//#region Virtuals
+
+// The locations this user owns
+UserSchema.virtual("ownedLocations", {
+  ref: "Location",
+  localField: "_id",
+  foreignField: "owner",
+});
+
+// The locations this user is a member of
+UserSchema.virtual("memberLocations", {
+  ref: "Location",
+  localField: "_id",
+  foreignField: "members",
+});
+
+// The locations this user has been invited to
+UserSchema.virtual("invitedLocations", {
+  ref: "Location",
+  localField: "_id",
+  foreignField: "invitedMembers",
 });
 
 //#endregion
@@ -341,12 +415,6 @@ UserSchema.statics.refreshTokens = async function (
   }
 };
 
-// Get a user's basic profile information
-UserSchema.statics.getUserProfile = async function (id: string) {
-  const user = await this.findById(id, "_id name photoUrl");
-  return user;
-};
-
 // Find a user by email or phone
 UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
   let user: HydratedDocument<User, UserInstanceMethods>;
@@ -366,6 +434,14 @@ UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
   }
 
   return user;
+};
+
+// Get detailed profile information for a user
+UserSchema.statics.getPrivateProfile = async function (id: string) {
+  return await this.findById(id).populate(
+    "ownedLocations",
+    "_id name owner.name owner._id owner.photoUrl"
+  );
 };
 
 //#endregion
@@ -392,7 +468,7 @@ UserSchema.methods.generateTokens = async function () {
   );
 
   const accessToken = jwt.sign({ user: body }, process.env.JWT_SECRET!, {
-    expiresIn: "7 days",
+    expiresIn: "7 days", //TODO: 15 minutes
   });
 
   this.refresh_token_secret = bcrypt.hashSync(refreshSecret, 10);
@@ -478,7 +554,7 @@ UserSchema.methods.getPasswordResetCode = async function () {
   const codeHash = bcrypt.hashSync(code, 10);
 
   this.password_reset_code = codeHash;
-  this.password_reset_expiry = new Date(new Date().getTime() + 5 * 60000);
+  this.password_reset_expiry = new Date(new Date().getTime() + 5 * 60000); // 5 minutes
   await this.save();
 
   return code;
@@ -511,7 +587,6 @@ UserSchema.methods.resetPassword = async function (
 
 //#endregion
 
-// Create the user model
 const UserModel = model<User, UserModel>("User", UserSchema);
 
 export default UserModel;

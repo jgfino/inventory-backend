@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from "express";
-import AuthorizableModel from "../schema/AuthorizableModel";
+import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
 import async from "async";
-import QueryChain from "../schema/QueryChain";
+import QueryChain from "../types/QueryChain";
 
 /**
  * Type to match a model to its respective QueryChain type.
@@ -30,49 +30,40 @@ type AnyAuthorizableModel = AuthorizableModel<
   unknown
 >;
 
-/**
- * The type for a basic middleware function
- */
-type middlewareFunc = (req: Request, res: Response, next: NextFunction) => any;
+type AnyQueryChain = QueryChain<unknown, unknown, unknown, unknown>;
+
+type AuthTuple = readonly [AnyAuthorizableModel, AuthModes];
+type TupleToQuery<T> = T extends AuthTuple ? ModelToQuery<T[0]> : never;
+type TuplesToQueries<T> = { [K in keyof T]: TupleToQuery<T[K]> };
 
 /**
- * The type for a middleware function which also includes authorized queries.
+ * Authorize the passed models with the given auth mode and catch async errors
+ * to avoid using try/catch.
+ * @param fn The function to catch errors for.
+ * @param models The models to authorize, paired with their auth mode.
+ * @returns An express-style req, res, next function
  */
-type authMiddlewareFunc<T extends AnyAuthorizableModel[]> = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-  ...authorizedQueries: ModelsToQueryMap<T>
-) => any;
-
-/**
- * Authorize the given models and catch async errors to pass to the next
- * middleware.
- * @param models The n number of MongoDB models to authorize.
- * @param fn The function to catch errors for. This is where all async/await
- *           logic should be. After req, res, next, it contains n QueryChain
- *           objects to perform authorized queries on the respective models
- * @returns An express-style req, res, next function.
- */
-export function authorizeAndCatchAsync<T extends AnyAuthorizableModel[]>(
-  models: T,
-  fn: authMiddlewareFunc<T>
+export function authorizeAndCatchAsync<T extends AuthTuple[]>(
+  fn: (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+    ...authorizedQueries: TuplesToQueries<T>
+  ) => Promise<any>,
+  ...models: T
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
     async
-      .map(models, (model, callback) => {
-        model.authorize(req.user._id, (err, query) => {
+      .mapSeries<AuthTuple, AnyQueryChain, Error>(models, (model, callback) => {
+        model[0].authorize(req.user._id, model[1], (err, query) => {
           if (err) {
             return callback(err);
+          } else {
+            return callback(null, query);
           }
-          callback(null, query);
         });
       })
-      .then((authorizedQueries) => {
-        fn(req, res, next, ...(authorizedQueries as ModelsToQueryMap<T>)).catch(
-          next
-        );
-      })
+      .then((queries) => fn(req, res, next, ...(queries as TuplesToQueries<T>)))
       .catch(next);
   };
 }
@@ -84,7 +75,9 @@ export function authorizeAndCatchAsync<T extends AnyAuthorizableModel[]>(
  *           should be.
  * @returns An express-style req, res, next function.
  */
-export const catchAsync = (fn: middlewareFunc) => {
+export const catchAsync = (
+  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+) => {
   return (req: Request, res: Response, next: NextFunction) => {
     fn(req, res, next).catch(next);
   };

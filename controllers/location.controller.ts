@@ -1,74 +1,109 @@
-/**
- * Defines CRUD operations for Locations and performs security checks.
- */
-
 import LocationModel from "../schema/location.schema";
-import { Request, Response } from "express";
-import _, { Dictionary } from "lodash";
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import DatabaseErrors from "../error/errors/database.errors";
-import UserModel from "../schema/user.schema";
 
 export const createLocation = catchAsync(async (req, res, next) => {
-  const newLocation = await LocationModel.createAuthorized(req.user._id, {
+  const newLocation = await LocationModel.create({
     ...req.body,
+    owner: req.user._id,
   });
   return res.status(200).json(newLocation);
 });
 
-export const findLocation = authorizeAndCatchAsync(
-  [LocationModel],
-  async (req, res, next, locations) => {
-    //const location = await locations.findOne({ _id: req.params.id ?? null });
+export const getLocations = authorizeAndCatchAsync(
+  async (req, res, next, locationModel) => {
+    const query = req.query;
+    const conditions: any = {};
 
-    const update = await locations.updateOne(
-      { _id: req.params.id ?? null },
-      { $set: { name: "Updated name" } }
-    );
-    console.log(update);
+    query.owner && (conditions.owner = String(query.owner));
+    query.search && (conditions.$text = { $search: String(query.search) });
 
-    // if (!location) {
-    //   return next(
-    //     DatabaseErrors.NOT_FOUND(
-    //       "A Location with this id was not found or you do not have permission to access it."
-    //     )
-    //   );
-    // }
+    const locationQuery = locationModel
+      .find(conditions)
+      .populate("owner", "_id name photoUrl");
 
-    res.status(200).send(update);
-  }
+    const locations = await locationQuery;
+    res.status(200).send(locations);
+  },
+  [LocationModel, "view"]
 );
 
-// export const findLocation = catchAsync(async (req, res, next) => {
+export const getLocation = authorizeAndCatchAsync(
+  async (req, res, next, locationModel) => {
+    let locationQuery = locationModel.findOne({ _id: req.params.id });
+    //.populate("owner", "_id name photoUrl")
+    //.populate("numItems");
 
-//   /**
-//    * catchAuthorized([LocationModel, UserModel], (authorized, req, res, next) => {
-//    *  await authorized.LocationModel.find()
-//    *  await authorized.UserModel.find()
-//    * })
-//    */
+    if (
+      req.path.substring(req.path.lastIndexOf("/") + 1).toLowerCase() ==
+      "details"
+    ) {
+      locationQuery = locationQuery.populateDetails().findOne();
+    }
 
-//   LocationModel.authorized(req.user._id, async (err, query) => {
-//     if (err) {
-//       return next(err);
-//     }
+    const location = await locationQuery;
 
-//     await new Promise(function (resolve, reject) {
-//       setTimeout(function () {
-//         reject("or nah");
-//       }, 1000);
-//     });
+    if (!location) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to view it."
+        )
+      );
+    }
 
-//     const location = await query.findOne({ _id: req.params.id }).lean();
-//     if (!location) {
-//       return next(
-//         DatabaseErrors.NOT_FOUND(
-//           "A Location with this id was not found or you do not have permission to access it."
-//         )
-//       );
-//     }
-//     res.status(200).send(location);
-//   });
-// });
+    res.status(200).send(location);
+  },
+  [LocationModel, "view"]
+);
 
-export const findLocations = catchAsync(async (req, res, next) => {});
+export const updateLocation = authorizeAndCatchAsync(
+  async (req, res, next, locationModel) => {
+    const newData = {
+      name: req.body.name,
+      iconName: req.body.iconName,
+      colorName: req.body.colorName,
+    };
+
+    const updateResult = await locationModel.updateOne(
+      { _id: req.params.id ?? null },
+      newData,
+      { runValidators: true }
+    );
+
+    if (updateResult.matchedCount < 1) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to modify it."
+        )
+      );
+    }
+
+    res
+      .status(200)
+      .send({ message: `Location ${req.params.id} updated successfully.` });
+  },
+  [LocationModel, "update"]
+);
+
+export const deleteLocation = authorizeAndCatchAsync(
+  async (req, res, next, locationModel) => {
+    const location = await locationModel.findOne({
+      _id: req.params.id ?? null,
+    });
+
+    if (!location) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to delete it."
+        )
+      );
+    }
+
+    await location.remove();
+
+    res
+      .status(200)
+      .send({ message: `Location ${req.params.id} deleted successfully.` });
+  },
+  [LocationModel, "delete"]
+);
