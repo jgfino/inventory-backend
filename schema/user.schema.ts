@@ -301,11 +301,11 @@ UserSchema.pre("remove", async function (next) {
     promises.push(doc.remove());
   });
 
-  // Remove membership of this user in locations
+  // Remove membership of this user in locations as well as notification info
   promises.push(
     LocationModel.updateMany(
       { members: this._id },
-      { $pull: { members: this._id } }
+      { $pull: { members: this._id, notificationDays: { user: this._id } } }
     ).exec()
   );
 
@@ -317,12 +317,6 @@ UserSchema.pre("remove", async function (next) {
 
   // Delete items owned by this user
   promises.push(ItemModel.deleteMany({ owner: this._id }).exec());
-
-  // Remove notification days for items for this user
-  ItemModel.updateMany(
-    { notificationDays: { $elemMatch: { user: this._id } } },
-    { $pull: { notificationDays: { user: this._id } } }
-  );
 
   // Await async operations
   await Promise.all(promises);
@@ -468,7 +462,7 @@ UserSchema.methods.generateTokens = async function () {
   );
 
   const accessToken = jwt.sign({ user: body }, process.env.JWT_SECRET!, {
-    expiresIn: "7 days", //TODO: 15 minutes
+    expiresIn: "15 minutes", //TODO: 15 minutes
   });
 
   this.refresh_token_secret = bcrypt.hashSync(refreshSecret, 10);

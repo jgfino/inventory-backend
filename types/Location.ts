@@ -25,4 +25,21 @@ export interface Location extends TimestampType {
    * The user ids of the members invited to this Location
    */
   invitedMembers: Types.Array<Types.ObjectId>;
+  /**
+   * When to notify different users about items in this location expiring
+   */
+  notificationDays?: Types.Array<{
+    /**
+     * The user id to notify
+     */
+    user: Types.ObjectId;
+    /**
+     * The array of days to use to notify this user
+     */
+    days: Types.Array<number>;
+  }>;
 }
+
+export type LocationAggregateData = {
+  totalValue?: Types.Decimal128;
+};

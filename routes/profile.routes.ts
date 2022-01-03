@@ -9,15 +9,9 @@ import express from "express";
 const router = express.Router();
 
 /**
- * Get the currently logged-in user
+ * Get the currently logged-in user.
  */
-router.get("/");
-
-/**
- * Get all profile information for the logged-in user. Including locations,
- * items, invitations
- */
-router.get("/profile", profile.getProfile);
+router.get("/", profile.getProfile);
 
 /**
  * Delete the currently logged in user

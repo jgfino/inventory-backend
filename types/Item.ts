@@ -34,19 +34,6 @@ export interface Item extends TimestampType {
    */
   opened?: Date;
   /**
-   * When to notify different users about this item expiring
-   */
-  notificationDays?: Types.Array<{
-    /**
-     * The user id to notify
-     */
-    user: Types.ObjectId;
-    /**
-     * The array of days to use to notify this user
-     */
-    days: Types.Array<number>;
-  }>;
-  /**
    * Where this item was purchased
    */
   purchaseLocation?: string;

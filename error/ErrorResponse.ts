@@ -21,7 +21,7 @@ export default class ErrorResponse extends Error {
     this.message = message;
     this.detail = detail ?? "No further details";
 
-    Object.setPrototypeOf(this, ErrorResponse.prototype);
     Error.captureStackTrace(this, this.constructor);
+    Object.setPrototypeOf(this, ErrorResponse.prototype);
   }
 }

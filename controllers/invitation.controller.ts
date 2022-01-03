@@ -4,36 +4,21 @@ import DatabaseErrors from "../error/errors/database.errors";
 import InvitationModel from "../schema/invitation.schema";
 import LocationModel from "../schema/location.schema";
 
-//TODO: change to authorized in schema
-export const createInvitation = authorizeAndCatchAsync(
-  async (req, res, next, locationModel) => {
-    const canAccessLocation = await locationModel.findOne(
-      { _id: req.body.location },
-      "_id"
-    );
+/**
+ * Create and send an invitation
+ */
+export const createInvitation = catchAsync(async (req, res, next) => {
+  const invitation = await InvitationModel.createAuthorized(
+    req.user._id,
+    req.body
+  );
+  //TODO: send invitation notification
+  res.status(200).send(invitation);
+});
 
-    if (!canAccessLocation) {
-      return next(
-        DatabaseErrors.NOT_FOUND(
-          "The specified location does not exist or you do not have permission to access it."
-        )
-      );
-    }
-
-    const invitation = await InvitationModel.create({
-      to: req.body.to,
-      from: req.user._id,
-      location: req.body.location,
-      message: req.body.message,
-    });
-
-    //TODO: send invitation notification
-
-    res.status(200).send(invitation);
-  },
-  [LocationModel, "update"]
-);
-
+/**
+ * Get multiple invitations.
+ */
 export const getInvitations = authorizeAndCatchAsync(
   async (req, res, next, invitationModel) => {
     const query = req.query;
@@ -43,30 +28,20 @@ export const getInvitations = authorizeAndCatchAsync(
     query.from && (conditions.from = String(query.from));
     query.location && (conditions.location = String(query.location));
 
-    const populate = query.full ? Boolean(query.full) : undefined;
-
-    let invitationQuery = invitationModel.find(conditions);
-    if (populate) {
-      invitationQuery = invitationQuery.populateDetails();
-    }
-
-    const invitations = await invitationQuery;
+    const invitations = await invitationModel
+      .find(conditions)
+      .sort({ createdAt: -1 });
     res.status(200).send(invitations);
   },
   [InvitationModel, "view"]
 );
 
+/**
+ * Get a single invitation
+ */
 export const getInvitation = authorizeAndCatchAsync(
   async (req, res, next, invitationModel) => {
-    const query = req.query;
-    const populate = query.full ? Boolean(query.full) : undefined;
-
-    let invitationQuery = invitationModel.findOne({ _id: req.params.id });
-    if (populate) {
-      invitationQuery = invitationQuery.populateDetails().findOne();
-    }
-
-    const invitation = await invitationQuery;
+    const invitation = await invitationModel.findOne({ _id: req.params.id });
     if (!invitation) {
       return next(
         DatabaseErrors.NOT_FOUND(
@@ -80,9 +55,17 @@ export const getInvitation = authorizeAndCatchAsync(
   [InvitationModel, "view"]
 );
 
+/**
+ * Accept an invitation
+ */
 export const acceptInvitation = authorizeAndCatchAsync(
   async (req, res, next, invitationModel) => {
-    const invitation = await invitationModel.findOne({ _id: req.params.id });
+    const invitation = await invitationModel.findOne(
+      { _id: req.params.id },
+      {},
+      { autopopulate: false }
+    );
+
     if (!invitation) {
       return next(
         DatabaseErrors.NOT_FOUND(
@@ -91,12 +74,17 @@ export const acceptInvitation = authorizeAndCatchAsync(
       );
     }
 
-    //TODO: change to auth
-
+    // Add the recipient to the location
     await LocationModel.updateOne(
       { _id: invitation.location },
-      { $addToSet: { members: req.user._id } }
+      {
+        $addToSet: {
+          members: req.user._id,
+          notificationDays: { user: req.user._id, days: [] },
+        },
+      }
     );
+
     await invitation.remove();
 
     //TODO: notify acceptance
@@ -106,9 +94,16 @@ export const acceptInvitation = authorizeAndCatchAsync(
   [InvitationModel, "update"]
 );
 
+/**
+ * Decline/delete an invitation
+ */
 export const declineInvitation = authorizeAndCatchAsync(
   async (req, res, next, invitationModel) => {
-    const invitation = await invitationModel.findOne({ _id: req.params.id });
+    const invitation = await invitationModel.findOne(
+      { _id: req.params.id },
+      {},
+      { autopopulate: false }
+    );
     if (!invitation) {
       return next(
         DatabaseErrors.NOT_FOUND(
@@ -118,9 +113,6 @@ export const declineInvitation = authorizeAndCatchAsync(
     }
 
     await invitation.remove();
-
-    //TODO: notify decline
-
     res.status(200).send({ message: "Invitation declined successfully" });
   },
   [InvitationModel, "delete"]

@@ -73,28 +73,28 @@ InvitationSchema.plugin(require("mongoose-autopopulate"));
  * the invitation's location.
  */
 InvitationSchema.pre("validate", async function (next) {
-  const model = mongoose.models["Invitation"] as InvitationModel;
-  const duplicateInvite = await model
-    .findOne({ to: this.to, location: this.location }, "_id")
-    .lean();
-
-  if (duplicateInvite) {
+  if (this.to.equals(this.from)) {
     return next(
-      DatabaseErrors.DUPLICATE_FIELD(
-        "This user has already been invited to this location."
-      )
+      DatabaseErrors.INVALID_FIELD("To and from fields cannot be the same")
     );
   }
 
-  const duplicateMembers = await LocationModel.findOne(
-    { $or: [{ owner: this.to }, { members: this.to }] },
+  const alreadyMember = await LocationModel.findOne(
+    {
+      _id: this.location,
+      $or: [
+        { owner: this.to },
+        { members: this.to },
+        { invitedMembers: this.to },
+      ],
+    },
     "_id"
   ).lean();
 
-  if (duplicateMembers) {
+  if (alreadyMember) {
     return next(
       DatabaseErrors.DUPLICATE_FIELD(
-        "This user is already a member of this location."
+        "This user is already a member of or has already been invited to this location."
       )
     );
   }
@@ -187,7 +187,7 @@ InvitationSchema.statics.createAuthorized = async function (
 
         const invitation = await InvitationModel.create({
           ...data,
-          owner: authId,
+          from: authId,
         });
 
         resolve(invitation);

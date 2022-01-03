@@ -1,7 +1,3 @@
-/**
- * Authentication methods for user registering, login, password management
- */
-
 import UserModel from "../schema/user.schema";
 import { catchAsync } from "../error/catchAsync";
 import { sendMail } from "../nodemailer/mailer";
@@ -17,9 +13,6 @@ import AuthErrors from "../error/errors/auth.errors";
 
 /**
  * Login a user, generating a new refresh token and 1 hr JWT.
- * @param req The request object.
- * @param res The response object.
- * @param next The next function.
  */
 export const login = catchAsync(async (req, res, next) => {
   const emailOrPhone = req.body.emailOrPhone;
@@ -30,6 +23,10 @@ export const login = catchAsync(async (req, res, next) => {
   }
 
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
 
   const passwordMatch = user.validatePassword(password);
   if (!passwordMatch) {
@@ -112,6 +109,11 @@ export const resetPassword = catchAsync(async (req, res, next) => {
   const password = req.body.password;
 
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
   const tokens = await user.resetPassword(resetCode, password);
 
   res.status(200).json({
@@ -126,6 +128,10 @@ export const resetPassword = catchAsync(async (req, res, next) => {
 export const forgotPassword = catchAsync(async (req, res, next) => {
   const emailOrPhone = req.params.emailOrPhone;
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
 
   const resetCode = await user.getPasswordResetCode();
 

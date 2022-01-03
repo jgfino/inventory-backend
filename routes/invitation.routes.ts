@@ -28,6 +28,6 @@ router.post("/:id/accept", invitations.acceptInvitation);
 /**
  * Decline an invitation
  */
-router.post("/:id/decline", invitations.declineInvitation);
+router.delete("/:id/decline", invitations.declineInvitation);
 
 export default router;

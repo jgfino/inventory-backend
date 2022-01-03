@@ -3,9 +3,68 @@ import { catchAsync } from "../error/catchAsync";
 import { sendMail } from "../nodemailer/mailer";
 import { VerifyEmailTemplate } from "../nodemailer/templates.nodemailer";
 import { sendSMS } from "../twilio/sms";
-import validator from "validator";
 import { VerifyPhoneTemplate } from "../twilio/templates.twilio";
 import AuthErrors from "../error/errors/auth.errors";
+import LocationModel from "../schema/location.schema";
+import ItemModel from "../schema/item.schema";
+import InvitationModel from "../schema/invitation.schema";
+
+/**
+ * Get the currently logged-in user
+ */
+export const getProfile = catchAsync(async (req, res, next) => {
+  const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
+  const locations = await LocationModel.find({ owner: user._id }).distinct(
+    "_id"
+  );
+  const items = await ItemModel.find({ owner: user._id }).distinct("_id");
+  const invitations = await InvitationModel.find({
+    to: user._id,
+  }).countDocuments();
+
+  const json: any = user.toJSON();
+  json.locations = locations;
+  json.items = items;
+  json.invitations = invitations;
+
+  res.status(200).send(json);
+});
+
+/**
+ * Delete the currently logged-in user
+ */
+export const deleteProfile = catchAsync(async (req, res, next) => {
+  const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
+  await user.remove();
+  res.status(200).send({ message: "User deleted successfully" });
+});
+
+/**
+ * Updates the current user. Updatable fields include email, phone, name.
+ */
+export const updateProfile = catchAsync(async (req, res, next) => {
+  const body = req.body;
+  const user = await UserModel.findById(req.user._id);
+
+  body.name !== undefined && (user.name = body.name);
+  body.email !== undefined && (user.email = body.email);
+  body.phone !== undefined && (user.phone = body.phone);
+
+  await user.save();
+  res.status(200).json({
+    message: "User updated successfully",
+  });
+});
 
 /**
  * Send a verification email to the logged-in user's email address. Errors
@@ -103,50 +162,5 @@ export const disable2fa = catchAsync(async (req, res, next) => {
 
   res.status(200).json({
     message: "2FA disabled successfully",
-  });
-});
-
-/**
- * Get the currently logged-in user
- */
-export const getProfile = catchAsync(async (req, res, next) => {
-  const user = await UserModel.findById(req.user._id);
-
-  if (!user) {
-    return next(AuthErrors.USER_NOT_FOUND);
-  }
-
-  res.status(200).send(user);
-});
-
-/**
- * Delete the currently logged-in user
- */
-export const deleteProfile = catchAsync(async (req, res, next) => {
-  const user = await UserModel.findById(req.user._id);
-
-  if (!user) {
-    return next(AuthErrors.USER_NOT_FOUND);
-  }
-
-  await user.remove();
-  res.status(200).send({ message: "User deleted successfully" });
-});
-
-/**
- * Updates the current user. Updatable fields include email, phone, name.
- */
-export const updateProfile = catchAsync(async (req, res, next) => {
-  const body = req.body;
-  const newData = {
-    name: body.name,
-    email: body.email,
-    phone: body.phone,
-  };
-  const user = await UserModel.findById(req.user._id);
-  user.set(newData);
-  await user.save();
-  res.status(200).json({
-    message: "User updated successfully",
   });
 });

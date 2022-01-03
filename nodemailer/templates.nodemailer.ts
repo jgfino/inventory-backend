@@ -35,8 +35,8 @@ export const ForgotPasswordEmailTemplate = (
 export const VerifyEmailTemplate = (verifyCode: string): EmailTemplate => {
   return {
     subject: "Your Inventory Verification Code",
-    text: `Enter this code to verify your email:\n.` + `${verifyCode}`,
+    text: `Enter this code to verify your email:\n` + `${verifyCode}`,
     html:
-      `<p>Enter this code to verify your email:\n.` + `<h2>${verifyCode}</h2>`,
+      `<p>Enter this code to verify your email:\n` + `<h2>${verifyCode}</h2>`,
   };
 };

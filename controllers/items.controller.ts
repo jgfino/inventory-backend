@@ -1,14 +1,29 @@
+import { UpdateWriteOpResult } from "mongoose";
 import nameFromUPC from "../edamam/nameFromUPC";
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import DatabaseErrors from "../error/errors/database.errors";
 import ItemModel from "../schema/item.schema";
 import { Item } from "../types/Item";
 
+/**
+ * Create an item
+ */
 export const createItem = catchAsync(async (req, res, next) => {
   const item = await ItemModel.createAuthorized(req.user._id, req.body);
   res.status(200).send(item);
 });
 
+/**
+ * Get an item name/brand from UPC
+ */
+export const getItemUPC = catchAsync(async (req, res, next) => {
+  const itemName = await nameFromUPC(req.params.upc);
+  res.status(200).send({ name: itemName });
+});
+
+/**
+ * Get multiple items.
+ */
 export const getItems = authorizeAndCatchAsync(
   async (req, res, next, itemModel) => {
     const query = req.query;
@@ -23,30 +38,22 @@ export const getItems = authorizeAndCatchAsync(
         : { $gte: new Date() });
     query.search && (conditions.$text = { $search: String(query.search) });
 
-    const items = await itemModel.find(conditions);
+    const items = await itemModel
+      .find(conditions)
+      .populate("location", "_id name");
     res.status(200).send(items);
   },
   [ItemModel, "view"]
 );
 
-export const getItemUPC = catchAsync(async (req, res, next) => {
-  const itemName = await nameFromUPC(req.params.upc);
-
-  res.status(200).send({ name: itemName });
-});
-
+/**
+ * Get a single item
+ */
 export const getItem = authorizeAndCatchAsync(
   async (req, res, next, itemModel) => {
-    let itemQuery = itemModel.findOne({ _id: req.params.id });
-
-    if (
-      req.path.substring(req.path.lastIndexOf("/") + 1).toLowerCase() ==
-      "details"
-    ) {
-      itemQuery = itemQuery.populateDetails().findOne();
-    }
-    const item = await itemQuery;
-
+    const item = await itemModel
+      .findOne({ _id: req.params.id })
+      .populate("location", "_id name");
     if (!item) {
       return next(
         DatabaseErrors.NOT_FOUND(
@@ -59,35 +66,34 @@ export const getItem = authorizeAndCatchAsync(
   [ItemModel, "view"]
 );
 
+/**
+ * Update an item.
+ */
 export const updateItem = authorizeAndCatchAsync(
   async (req, res, next, itemModel) => {
     const body = req.body;
-    const newData: Partial<Item> = {
-      name: body.name,
-      category: body.category,
-      iconName: body.iconName,
-      colorName: body.colorName,
-      expirationDate: body.expirationDate,
-      notificationDays: body.notificationDays,
-      purchaseLocation: body.purchaseLocation,
-      notes: body.notes,
-      opened: body.opened,
-    };
+    const { owner, location, notificationDays, ...newData } = req.body;
 
-    const updateResult = await itemModel.updateOne(
-      { _id: req.params.id },
-      newData,
-      { runValidators: true }
-    );
+    let updateResult = itemModel.updateOne({ _id: req.params.id }, newData, {
+      runValidators: true,
+    });
 
-    if (updateResult.matchedCount < 1) {
+    if (notificationDays) {
+      updateResult = updateResult.updateOne(
+        { _id: req.params.id, "notificationDays.user": req.user._id },
+        { $set: { "notificationDays.$.days": notificationDays } }
+      );
+    }
+
+    const result = await updateResult;
+
+    if (result.matchedCount < 1) {
       return next(
         DatabaseErrors.NOT_FOUND(
           "An item with this id does not exist or you do not have permission to modify it."
         )
       );
     }
-
     res
       .status(200)
       .send({ message: `Item ${req.params.id} updated successfully` });
@@ -95,6 +101,9 @@ export const updateItem = authorizeAndCatchAsync(
   [ItemModel, "update"]
 );
 
+/**
+ * Delete an item
+ */
 export const deleteItem = authorizeAndCatchAsync(
   async (req, res, next, itemModel) => {
     const item = await itemModel.findOne({ _id: req.params.id });

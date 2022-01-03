@@ -13,6 +13,6 @@ const router = express.Router();
  * - Mutual locations
  * - Owned items in mutual locations
  */
-router.get("/:id/profile", users.getUser);
+router.get("/:id/profile", users.getUserProfile);
 
 export default router;

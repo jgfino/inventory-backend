@@ -1,15 +1,21 @@
 import LocationModel from "../schema/location.schema";
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import DatabaseErrors from "../error/errors/database.errors";
+import mongoose, { Types } from "mongoose";
+import { LocationAggregateData } from "../types/Location";
+import ItemModel from "../schema/item.schema";
 
+/**
+ * Create a location
+ */
 export const createLocation = catchAsync(async (req, res, next) => {
-  const newLocation = await LocationModel.create({
-    ...req.body,
-    owner: req.user._id,
-  });
-  return res.status(200).json(newLocation);
+  const location = await LocationModel.createAuthorized(req.user._id, req.body);
+  res.status(200).send(location);
 });
 
+/**
+ * Get multiple locations
+ */
 export const getLocations = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const query = req.query;
@@ -18,30 +24,18 @@ export const getLocations = authorizeAndCatchAsync(
     query.owner && (conditions.owner = String(query.owner));
     query.search && (conditions.$text = { $search: String(query.search) });
 
-    const locationQuery = locationModel
-      .find(conditions)
-      .populate("owner", "_id name photoUrl");
-
-    const locations = await locationQuery;
+    const locations = await locationModel.find(conditions).sort({ name: 1 });
     res.status(200).send(locations);
   },
   [LocationModel, "view"]
 );
 
+/**
+ * Get one location
+ */
 export const getLocation = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
-    let locationQuery = locationModel.findOne({ _id: req.params.id });
-    //.populate("owner", "_id name photoUrl")
-    //.populate("numItems");
-
-    if (
-      req.path.substring(req.path.lastIndexOf("/") + 1).toLowerCase() ==
-      "details"
-    ) {
-      locationQuery = locationQuery.populateDetails().findOne();
-    }
-
-    const location = await locationQuery;
+    const location = await locationModel.findOne({ _id: req.params.id });
 
     if (!location) {
       return next(
@@ -56,16 +50,55 @@ export const getLocation = authorizeAndCatchAsync(
   [LocationModel, "view"]
 );
 
+/**
+ * Get location with details
+ */
+export const getLocationDetails = authorizeAndCatchAsync(
+  async (req, res, next, locationModel, itemModel) => {
+    const location = await locationModel
+      .findOne({ _id: req.params.id })
+      .populate("members", "_id name photoUrl")
+      .populate("invitedMembers", "_id name photoUrl");
+
+    if (!location) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to view it."
+        )
+      );
+    }
+
+    const items = await itemModel.find({ location: req.params.id });
+    const totalValue = items.reduce(
+      (a, b) => a + Number.parseFloat(b.price?.toString()),
+      0
+    );
+
+    const json: any = location.toJSON();
+    json.totalValue = totalValue;
+    json.items = items;
+
+    res.status(200).send(json);
+  },
+  [LocationModel, "view"],
+  [ItemModel, "view"]
+);
+
+/**
+ * Update a location
+ */
 export const updateLocation = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
+    const { notificationDays, name, iconName } = req.body;
+
     const newData = {
-      name: req.body.name,
-      iconName: req.body.iconName,
-      colorName: req.body.colorName,
+      name: name,
+      iconName: iconName,
+      "notificationDays.$.days": notificationDays,
     };
 
     const updateResult = await locationModel.updateOne(
-      { _id: req.params.id ?? null },
+      { _id: req.params.id, "notificationDays.user": req.user._id },
       newData,
       { runValidators: true }
     );
@@ -85,10 +118,13 @@ export const updateLocation = authorizeAndCatchAsync(
   [LocationModel, "update"]
 );
 
+/**
+ * Delete a location
+ */
 export const deleteLocation = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const location = await locationModel.findOne({
-      _id: req.params.id ?? null,
+      _id: req.params.id,
     });
 
     if (!location) {
@@ -106,4 +142,31 @@ export const deleteLocation = authorizeAndCatchAsync(
       .send({ message: `Location ${req.params.id} deleted successfully.` });
   },
   [LocationModel, "delete"]
+);
+
+export const removeMember = authorizeAndCatchAsync(
+  async (req, res, next, locationModel) => {
+    const updatedLocation = await locationModel.updateOne(
+      { _id: req.params.id },
+      {
+        $pull: {
+          members: req.params.memberId,
+          notificationDays: { user: req.params.memberId },
+        },
+      }
+    );
+
+    if (updatedLocation.matchedCount < 1) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A location with this id does not exist or you do not have permission to modify it."
+        )
+      );
+    }
+
+    res
+      .status(200)
+      .send({ message: `Location ${req.params.id} updated successfully.` });
+  },
+  [LocationModel, "update"]
 );

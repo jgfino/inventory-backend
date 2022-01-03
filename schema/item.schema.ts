@@ -1,4 +1,4 @@
-import { HydratedDocument, model, Schema } from "mongoose";
+import { HydratedDocument, model, Schema, Types } from "mongoose";
 import ErrorResponse from "../error/ErrorResponse";
 import DatabaseErrors from "../error/errors/database.errors";
 import { Item } from "../types/Item";
@@ -6,7 +6,7 @@ import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
 import LocationModel from "./location.schema";
 import QueryChain from "../types/QueryChain";
 
-type ItemQuery = QueryChain<Item, {}, {}, ItemVirtuals>;
+export type ItemQuery = QueryChain<Item, {}, {}, ItemVirtuals>;
 
 interface ItemVirtuals {
   /**
@@ -47,7 +47,6 @@ const ItemSchema = new Schema<Item, ItemModel, {}>(
       type: Schema.Types.ObjectId,
       ref: "Location",
       required: [true, "Item location required"],
-      autopopulate: { select: "_id name" },
     },
     expirationDate: {
       type: Date,
@@ -55,24 +54,13 @@ const ItemSchema = new Schema<Item, ItemModel, {}>(
     opened: {
       type: Date,
     },
-    notificationDays: [
-      {
-        type: {
-          user: Schema.Types.ObjectId,
-          days: [
-            {
-              type: Number,
-            },
-          ],
-        },
-      },
-    ],
     purchaseLocation: {
       type: String,
       maxlength: 300,
     },
     price: {
       type: Schema.Types.Decimal128,
+      default: new Types.Decimal128("0.00"),
     },
     notes: {
       type: String,
@@ -86,6 +74,9 @@ const ItemSchema = new Schema<Item, ItemModel, {}>(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+
+        const price: Types.Decimal128 = ret.price;
+        ret.price = price ? price.toString() : undefined;
       },
       virtuals: true,
     },
@@ -98,7 +89,7 @@ ItemSchema.plugin(require("mongoose-autopopulate"));
 
 // Determine if item has expired
 ItemSchema.virtual("expired").get(function (this: HydratedDocument<Item>) {
-  return this.expirationDate < new Date();
+  return this.expirationDate ? this.expirationDate < new Date() : false;
 });
 
 //#endregion
@@ -118,13 +109,7 @@ ItemSchema.statics.authorize = function (
   LocationModel.find({ $or: [{ members: authId }, { owner: authId }] })
     .distinct("_id")
     .then((locations) => {
-      cb(
-        null,
-        this.find(
-          { location: { $in: locations } },
-          { notificationDays: { $elemMatch: { user: authId } } }
-        )
-      );
+      cb(null, this.find({ location: { $in: locations } }));
     })
     .catch((error) => cb(error, null));
 };

@@ -1,4 +1,4 @@
-import { model, Schema, Types } from "mongoose";
+import { HydratedDocument, model, Schema, Types } from "mongoose";
 import { Location } from "../types/Location";
 import InvitationModel from "./invitation.schema";
 import ErrorResponse from "../error/ErrorResponse";
@@ -61,6 +61,19 @@ const LocationSchema = new Schema<Location, LocationModel, {}>(
         ref: "User",
       },
     ],
+    notificationDays: [
+      {
+        type: {
+          user: Schema.Types.ObjectId,
+          days: [
+            {
+              type: Number,
+            },
+          ],
+        },
+        _id: false,
+      },
+    ],
   },
   {
     timestamps: true,
@@ -119,22 +132,35 @@ LocationSchema.statics.authorize = function (
   mode: AuthModes,
   cb: (err: ErrorResponse, query: LocationQuery) => void
 ) {
-  let query: LocationQuery;
+  let query = this.find(
+    {},
+    {
+      notificationDays: { $elemMatch: { user: authId } },
+      name: 1,
+      iconName: 1,
+      owner: 1,
+      members: 1,
+      invitedMembers: 1,
+    }
+  );
   switch (mode) {
     case "delete":
-      query = this.find({ owner: authId });
+      query = query.find({ owner: authId }).populate("numItems");
       break;
     case "update":
+      query = query.find().or([{ owner: authId }, { members: authId }]);
+      break;
     case "view":
-      query = this.find().or([{ owner: authId }, { members: authId }]);
+      query = query
+        .find()
+        .or([{ owner: authId }, { members: authId }])
+        .populate("numItems");
       break;
     case "preview":
-      query = this.find({ invitedMembers: authId });
+      query = query.find({ invitedMembers: authId }).populate("numItems");
       break;
   }
 
-  // Always populate the number of items.
-  query = query.populate("numItems");
   cb(null, query);
 };
 
@@ -148,9 +174,15 @@ LocationSchema.statics.createAuthorized = async function (
   authId: string,
   data: Partial<Location>
 ) {
-  await LocationModel.create({
+  return await LocationModel.create({
     ...data,
     owner: authId,
+    notificationDays: [
+      {
+        user: authId,
+        days: [],
+      },
+    ],
   });
 };
 

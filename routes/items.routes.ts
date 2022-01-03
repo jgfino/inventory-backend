@@ -15,8 +15,7 @@ router.get("/upc/:upc", items.getItemUPC);
 
 /**
  * Get all items. Filter by location id, category, owner id, expired.
- * Search by name. Location and owner data included. Sorted by name by default;
- * can sort by category, expiration date, opened date, created date, price
+ * Search by name. Location and owner data included. Sorted by name.
  */
 router.get("/", items.getItems);
 
@@ -27,7 +26,7 @@ router.get("/:id", items.getItem);
 
 /**
  * Update the item with the given id. Updatable fields include everything
- * except owner and location. Notification days is selectively updatable
+ * except owner and location.
  */
 router.put("/:id", items.updateItem);
 
