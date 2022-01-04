@@ -20,8 +20,7 @@ router.get("/", locations.getLocations);
 router.get("/:id", locations.getLocation);
 
 /**
- * Get a location with the given id. Populate owner, member, invited members,
- * total value
+ * Get a location with the given id. Populate owner, member, total value
  */
 router.get("/:id/details", locations.getLocationDetails);
 
@@ -35,6 +34,12 @@ router.put("/:id", locations.updateLocation);
  * Delete the location with the given id.
  */
 router.delete("/:id", locations.deleteLocation);
+
+/**
+ * Add the requesting user to the given location. Users can only add themselves
+ * to a location.
+ */
+router.post("/:id/members/:memberId", locations.addMember);
 
 /**
  * Remove a member from a location.

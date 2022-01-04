@@ -21,14 +21,12 @@ import mongoose from "mongoose";
 
 import UserModel from "./schema/user.schema";
 import LocationModel from "./schema/location.schema";
-import InvitationModel from "./schema/invitation.schema";
 import ItemModel from "./schema/item.schema";
 
 import locations from "./routes/location.routes";
 import auth from "./routes/auth.routes";
 import users from "./routes/user.routes";
 import profiles from "./routes/profile.routes";
-import invitations from "./routes/invitation.routes";
 import items from "./routes/items.routes";
 import ErrorResponse from "./error/ErrorResponse";
 
@@ -42,7 +40,6 @@ const db = {
   url: process.env.MONGODB_URL,
   users: UserModel,
   locations: LocationModel,
-  invitations: InvitationModel,
   items: ItemModel,
 };
 
@@ -76,7 +73,6 @@ app.use("/api/v1/auth", auth);
 app.use("/api/v1/profile", jwtAuth, profiles);
 app.use("/api/v1/users", jwtAuth, users);
 app.use("/api/v1/locations", jwtAuth, locations);
-app.use("/api/v1/invitations", jwtAuth, invitations);
 app.use("/api/v1/items", jwtAuth, items);
 
 app.all("*", (req, res, next) => {
@@ -130,28 +126,6 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     message: error.message,
     detail: error.detail,
   });
-});
-
-// Cron job to delete expired invitations
-cron.schedule("1 0 * * *", async () => {
-  try {
-    console.log(`[${new Date()}] Deleting expired invitations...`);
-    const expiredInvitations = await InvitationModel.find({
-      expires: { $lte: new Date() },
-    });
-
-    await Promise.all(
-      expiredInvitations.map(async (doc) => {
-        return await doc.remove();
-      })
-    );
-
-    console.log(
-      `[${new Date()}] Removed ${expiredInvitations.length} expired invitations`
-    );
-  } catch (err) {
-    console.error("There was an error deleting expired invitations: ", err);
-  }
 });
 
 //TODO: cron job to notify expired.

@@ -7,7 +7,6 @@ import { VerifyPhoneTemplate } from "../twilio/templates.twilio";
 import AuthErrors from "../error/errors/auth.errors";
 import LocationModel from "../schema/location.schema";
 import ItemModel from "../schema/item.schema";
-import InvitationModel from "../schema/invitation.schema";
 
 /**
  * Get the currently logged-in user
@@ -23,14 +22,10 @@ export const getProfile = catchAsync(async (req, res, next) => {
     "_id"
   );
   const items = await ItemModel.find({ owner: user._id }).distinct("_id");
-  const invitations = await InvitationModel.find({
-    to: user._id,
-  }).countDocuments();
 
   const json: any = user.toJSON();
   json.locations = locations;
   json.items = items;
-  json.invitations = invitations;
 
   res.status(200).send(json);
 });

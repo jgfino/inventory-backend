@@ -1,9 +1,9 @@
 import { HydratedDocument, model, Schema, Types } from "mongoose";
 import { Location } from "../types/Location";
-import InvitationModel from "./invitation.schema";
 import ErrorResponse from "../error/ErrorResponse";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
+import ItemModel from "./item.schema";
 
 //#region Types
 
@@ -48,13 +48,6 @@ const LocationSchema = new Schema<Location, LocationModel, {}>(
       autopopulate: { select: "_id name photoUrl" },
     },
     members: [
-      {
-        type: Types.ObjectId,
-        required: true,
-        ref: "User",
-      },
-    ],
-    invitedMembers: [
       {
         type: Types.ObjectId,
         required: true,
@@ -106,12 +99,8 @@ LocationSchema.virtual("numItems", {
 
 // Delete related items when removing a location
 LocationSchema.pre("remove", async function (next) {
-  // Delete invitations to this location
-  await InvitationModel.deleteMany({ location: this._id });
-
   // Delete items in this location
-  await InvitationModel.deleteMany({ location: this._id });
-
+  await ItemModel.deleteMany({ location: this._id });
   next();
 });
 
@@ -123,7 +112,6 @@ LocationSchema.pre("remove", async function (next) {
  * See if a user is authorized to view a location. Users are authorized if:
  * - They are the owner of a location (view, update, delete)
  * - They are a member of a location (view and update only)
- * - They have been invited to a location (preview)
  * @param authId The user id to check
  * @param cb Callback with the authorized query
  */
@@ -140,7 +128,6 @@ LocationSchema.statics.authorize = function (
       iconName: 1,
       owner: 1,
       members: 1,
-      invitedMembers: 1,
     }
   );
   switch (mode) {
@@ -155,9 +142,6 @@ LocationSchema.statics.authorize = function (
         .find()
         .or([{ owner: authId }, { members: authId }])
         .populate("numItems");
-      break;
-    case "preview":
-      query = query.find({ invitedMembers: authId }).populate("numItems");
       break;
   }
 

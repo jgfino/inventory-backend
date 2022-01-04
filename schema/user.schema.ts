@@ -3,7 +3,6 @@ import { User } from "../types/User";
 import bcrypt from "bcryptjs";
 import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import LocationModel from "./location.schema";
-import InvitationModel from "./invitation.schema";
 import mongoose from "mongoose";
 import validator from "validator";
 import crypto from "crypto";
@@ -72,23 +71,6 @@ interface UserInstanceMethods {
    * @param newPassword The user's new password.
    */
   resetPassword(code: string, newPassword: string): Promise<AuthJSON>;
-}
-
-interface UserVirtuals {
-  /**
-   * The locations owned by this user
-   */
-  ownedLocations: Location[];
-
-  /**
-   * The locations this user is a member of
-   */
-  memberLocations: Location[];
-
-  /**
-   * The locations this user has been invited to
-   */
-  invitedLocations: Location[];
 }
 
 /**
@@ -309,12 +291,6 @@ UserSchema.pre("remove", async function (next) {
     ).exec()
   );
 
-  // Delete invitations sent by this user
-  const invitations = await InvitationModel.find({ from: this._id });
-  invitations.forEach((doc) => {
-    promises.push(doc.remove());
-  });
-
   // Delete items owned by this user
   promises.push(ItemModel.deleteMany({ owner: this._id }).exec());
 
@@ -322,31 +298,6 @@ UserSchema.pre("remove", async function (next) {
   await Promise.all(promises);
 
   next();
-});
-
-//#endregion
-
-//#region Virtuals
-
-// The locations this user owns
-UserSchema.virtual("ownedLocations", {
-  ref: "Location",
-  localField: "_id",
-  foreignField: "owner",
-});
-
-// The locations this user is a member of
-UserSchema.virtual("memberLocations", {
-  ref: "Location",
-  localField: "_id",
-  foreignField: "members",
-});
-
-// The locations this user has been invited to
-UserSchema.virtual("invitedLocations", {
-  ref: "Location",
-  localField: "_id",
-  foreignField: "invitedMembers",
 });
 
 //#endregion

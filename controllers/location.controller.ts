@@ -1,8 +1,6 @@
 import LocationModel from "../schema/location.schema";
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import DatabaseErrors from "../error/errors/database.errors";
-import mongoose, { Types } from "mongoose";
-import { LocationAggregateData } from "../types/Location";
 import ItemModel from "../schema/item.schema";
 
 /**
@@ -57,8 +55,7 @@ export const getLocationDetails = authorizeAndCatchAsync(
   async (req, res, next, locationModel, itemModel) => {
     const location = await locationModel
       .findOne({ _id: req.params.id })
-      .populate("members", "_id name photoUrl")
-      .populate("invitedMembers", "_id name photoUrl");
+      .populate("members", "_id name photoUrl");
 
     if (!location) {
       return next(
@@ -144,6 +141,34 @@ export const deleteLocation = authorizeAndCatchAsync(
   [LocationModel, "delete"]
 );
 
+export const addMember = catchAsync(async (req, res, next) => {
+  if (req.user._id != req.params.memberId) {
+    return next(DatabaseErrors.NOT_AUTHORIZED);
+  }
+
+  const updatedLocation = await LocationModel.updateOne(
+    { _id: req.params.id, owner: { $ne: req.user._id } },
+    {
+      $addToSet: {
+        members: req.user._id,
+        notificationDays: { user: req.user._id },
+      },
+    }
+  );
+
+  if (updatedLocation.matchedCount < 1) {
+    return next(
+      DatabaseErrors.NOT_FOUND(
+        "A location with this id does not exist or you do not have permission to add this user to it."
+      )
+    );
+  }
+
+  res
+    .status(200)
+    .send({ message: `Location ${req.params.id} updated successfully.` });
+});
+
 export const removeMember = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const updatedLocation = await locationModel.updateOne(
@@ -163,6 +188,12 @@ export const removeMember = authorizeAndCatchAsync(
         )
       );
     }
+
+    // Delete items in this location owned by the removed member
+    await ItemModel.deleteMany({
+      owner: req.params.memberId,
+      location: req.params.id,
+    });
 
     res
       .status(200)
