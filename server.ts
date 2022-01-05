@@ -2,6 +2,7 @@ declare global {
   namespace Express {
     interface User {
       _id: string;
+      subscribed: boolean;
     }
     interface Response {
       sendNotFoundError(msg: String): void;
@@ -157,6 +158,8 @@ cron.schedule("0 0 * * *", async () => {
     console.error("There was an error removing expired user tokens.");
   }
 });
+
+//TODO: cron job to delete old data of unsubscribed users and remove them from extra shared locations
 
 mongoose.set("debug", true);
 

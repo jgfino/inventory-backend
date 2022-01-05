@@ -4,6 +4,7 @@ import ErrorResponse from "../error/ErrorResponse";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
 import ItemModel from "./item.schema";
+import AuthErrors from "../error/errors/auth.errors";
 
 //#region Types
 
@@ -155,15 +156,38 @@ LocationSchema.statics.authorize = function (
  * @param data The data to create with.
  */
 LocationSchema.statics.createAuthorized = async function (
-  authId: string,
+  auth: Express.User,
   data: Partial<Location>
 ) {
+  if (!auth.subscribed) {
+    if (
+      data.name.toLowerCase() != "fridge" &&
+      data.name.toLowerCase() != "pantry"
+    ) {
+      return Promise.reject(
+        AuthErrors.PREMIUM_FEATURE(
+          "Only Pantry and Fridge Locations can be created with a free account"
+        )
+      );
+    }
+
+    const hasLocation = await this.findOne({ owner: auth._id }, "_id");
+
+    if (hasLocation) {
+      return Promise.reject(
+        AuthErrors.PREMIUM_FEATURE(
+          "A paid account is required to create more than one Location"
+        )
+      );
+    }
+  }
+
   return await LocationModel.create({
     ...data,
-    owner: authId,
+    owner: auth._id,
     notificationDays: [
       {
-        user: authId,
+        user: auth._id,
         days: [],
       },
     ],

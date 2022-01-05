@@ -150,6 +150,11 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       type: Boolean,
       default: false,
     },
+    was_subscribed: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
     account_verification_code: {
       type: {
         code: String,
@@ -413,7 +418,7 @@ UserSchema.methods.generateTokens = async function () {
   );
 
   const accessToken = jwt.sign({ user: body }, process.env.JWT_SECRET!, {
-    expiresIn: "15 minutes", //TODO: 15 minutes
+    expiresIn: "15 minutes",
   });
 
   this.refresh_token_secret = bcrypt.hashSync(refreshSecret, 10);

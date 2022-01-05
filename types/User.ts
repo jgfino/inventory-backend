@@ -33,6 +33,13 @@ export interface User {
   phone_verified: boolean;
 
   /**
+   * Whether this user ever had an active subscription. Used client-side
+   * for explaining loss of access to items/locations when subscription
+   * expires
+   */
+  was_subscribed: boolean;
+
+  /**
    * The 6 digit code used to verify a user's email/phone number. Also used
    * for 2FA.
    */

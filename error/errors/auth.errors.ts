@@ -8,6 +8,13 @@ const AuthErrors = {
     new ErrorResponse("auth/jwt-expired", 401, "JWT token expired", detail),
   JWT_INVALID: (detail?: string) =>
     new ErrorResponse("auth/jwt-invalid", 401, "JWT token invalid", detail),
+  PREMIUM_FEATURE: (detail?: string) =>
+    new ErrorResponse(
+      "auth/premium-feature",
+      401,
+      "This action requires a paid account.",
+      detail
+    ),
   NO_EMAIL: new ErrorResponse(
     "auth/no-email",
     404,

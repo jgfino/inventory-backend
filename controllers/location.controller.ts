@@ -4,15 +4,17 @@ import DatabaseErrors from "../error/errors/database.errors";
 import ItemModel from "../schema/item.schema";
 
 /**
- * Create a location
+ * Create a location. Users can create one location on a free account and
+ * unlimited on premium
  */
 export const createLocation = catchAsync(async (req, res, next) => {
-  const location = await LocationModel.createAuthorized(req.user._id, req.body);
+  const location = await LocationModel.createAuthorized(req.user, req.body);
   res.status(200).send(location);
 });
 
 /**
- * Get multiple locations
+ * Get multiple locations. For a free account, only the user's oldest personal
+ * location and locations show up.
  */
 export const getLocations = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
@@ -23,6 +25,17 @@ export const getLocations = authorizeAndCatchAsync(
     query.search && (conditions.$text = { $search: String(query.search) });
 
     const locations = await locationModel.find(conditions).sort({ name: 1 });
+
+    if (!req.user.subscribed) {
+      const oldestLocation = locations.reduce((prev, curr) =>
+        prev.createdAt > curr.createdAt ? curr : prev
+      );
+      const memberLocations = locations.filter(
+        (loc) => !loc.owner.equals(req.user._id)
+      );
+      return res.status(200).send([oldestLocation, ...memberLocations]);
+    }
+
     res.status(200).send(locations);
   },
   [LocationModel, "view"]

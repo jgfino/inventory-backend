@@ -5,7 +5,7 @@ import QueryChain from "./QueryChain";
 /**
  * Different modes for authorizing a model before use
  */
-export type AuthModes = ("view" | "update" | "delete" | "preview") & string;
+export type AuthModes = ("view" | "update" | "delete") & string;
 
 /**
  * A mongoose model which can be authorized before querying
@@ -36,7 +36,7 @@ export default interface AuthorizableModel<
    * @param data The data to use to create the document.
    */
   createAuthorized(
-    authId: string,
+    auth: Express.User,
     data: Partial<T>
   ): Promise<HydratedDocument<T, TMethods, TVirtuals>>;
 }
