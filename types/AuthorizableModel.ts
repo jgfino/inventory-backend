@@ -1,4 +1,13 @@
-import { Model, HydratedDocument } from "mongoose";
+import {
+  Model,
+  HydratedDocument,
+  FilterQuery,
+  UpdateWithAggregationPipeline,
+  UpdateQuery,
+  QueryOptions,
+  UpdateWriteOpResult,
+  Document,
+} from "mongoose";
 import ErrorResponse from "../error/ErrorResponse";
 import QueryChain from "./QueryChain";
 
@@ -23,7 +32,7 @@ export default interface AuthorizableModel<
    * @param cb Callback with the authorized query
    */
   authorize(
-    authId: string,
+    auth: Express.User,
     mode: AuthModes,
     cb: (
       err: ErrorResponse,
@@ -36,7 +45,7 @@ export default interface AuthorizableModel<
    * @param data The data to use to create the document.
    */
   createAuthorized(
-    auth: Express.User,
+    authId: Express.User,
     data: Partial<T>
   ): Promise<HydratedDocument<T, TMethods, TVirtuals>>;
 }

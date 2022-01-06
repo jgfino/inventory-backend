@@ -9,7 +9,7 @@ import { Item } from "../types/Item";
  * Create an item
  */
 export const createItem = catchAsync(async (req, res, next) => {
-  const item = await ItemModel.createAuthorized(req.user._id, req.body);
+  const item = await ItemModel.createAuthorized(req.user, req.body);
   res.status(200).send(item);
 });
 

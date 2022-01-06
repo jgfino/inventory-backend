@@ -18,16 +18,7 @@ export const getProfile = catchAsync(async (req, res, next) => {
     return next(AuthErrors.USER_NOT_FOUND);
   }
 
-  const locations = await LocationModel.find({ owner: user._id }).distinct(
-    "_id"
-  );
-  const items = await ItemModel.find({ owner: user._id }).distinct("_id");
-
-  const json: any = user.toJSON();
-  json.locations = locations;
-  json.items = items;
-
-  res.status(200).send(json);
+  res.status(200).send(user);
 });
 
 /**

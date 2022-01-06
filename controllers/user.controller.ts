@@ -25,36 +25,19 @@ export const getUserProfile = catchAsync(async (req, res, next) => {
     return next(DatabaseErrors.NOT_FOUND("A user with this id was not found."));
   }
 
-  const mutualLocations = await LocationModel.find(
-    {
-      $or: [
-        { members: { $all: [id, authId] } },
-        { owner: id, members: authId },
-        { owner: authId, members: id },
-      ],
-    },
-    "name iconName owner members"
-  );
+  LocationModel.authorize(req.user, "view", async (err, query) => {
+    if (err) return next(err);
 
-  const mutualItems = await ItemModel.find(
-    {
-      location: { $in: mutualLocations.map((doc) => doc._id) },
-      owner: id,
-    },
-    {},
-    { autopopulate: false }
-  );
-
-  const json: any = user.toJSON();
-
-  const locationsWithItems = mutualLocations.map((loc) => {
-    const items = mutualItems.filter((item) => item.location.equals(loc._id));
-    const locationWithItems: any = loc.toJSON();
-    locationWithItems.items = items;
-    return locationWithItems;
+    try {
+      const mutualLocations = await query.find(
+        { $or: [{ owner: id }, { members: id }] },
+        "name iconName owner members numItems"
+      );
+      const json: any = user.toJSON();
+      json.mutualLocations = mutualLocations;
+      res.status(200).send(json);
+    } catch (error) {
+      return next(error);
+    }
   });
-
-  json.locations = locationsWithItems;
-
-  res.status(200).send(json);
 });

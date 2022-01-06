@@ -13,8 +13,7 @@ export const createLocation = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Get multiple locations. For a free account, only the user's oldest personal
- * location and locations show up.
+ * Get multiple locations.
  */
 export const getLocations = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
@@ -24,18 +23,7 @@ export const getLocations = authorizeAndCatchAsync(
     query.owner && (conditions.owner = String(query.owner));
     query.search && (conditions.$text = { $search: String(query.search) });
 
-    const locations = await locationModel.find(conditions).sort({ name: 1 });
-
-    if (!req.user.subscribed) {
-      const oldestLocation = locations.reduce((prev, curr) =>
-        prev.createdAt > curr.createdAt ? curr : prev
-      );
-      const memberLocations = locations.filter(
-        (loc) => !loc.owner.equals(req.user._id)
-      );
-      return res.status(200).send([oldestLocation, ...memberLocations]);
-    }
-
+    const locations = await locationModel.find(conditions);
     res.status(200).send(locations);
   },
   [LocationModel, "view"]
@@ -154,63 +142,28 @@ export const deleteLocation = authorizeAndCatchAsync(
   [LocationModel, "delete"]
 );
 
+/**
+ * Add a member to a location. Users can only add themselves to a location.
+ * Free users can only add themselves to one Location at a time
+ */
 export const addMember = catchAsync(async (req, res, next) => {
-  if (req.user._id != req.params.memberId) {
-    return next(DatabaseErrors.NOT_AUTHORIZED);
-  }
-
-  const updatedLocation = await LocationModel.updateOne(
-    { _id: req.params.id, owner: { $ne: req.user._id } },
-    {
-      $addToSet: {
-        members: req.user._id,
-        notificationDays: { user: req.user._id },
-      },
-    }
-  );
-
-  if (updatedLocation.matchedCount < 1) {
-    return next(
-      DatabaseErrors.NOT_FOUND(
-        "A location with this id does not exist or you do not have permission to add this user to it."
-      )
-    );
-  }
-
+  await LocationModel.addMember(req.user, req.params.id);
   res
     .status(200)
     .send({ message: `Location ${req.params.id} updated successfully.` });
 });
 
-export const removeMember = authorizeAndCatchAsync(
-  async (req, res, next, locationModel) => {
-    const updatedLocation = await locationModel.updateOne(
-      { _id: req.params.id },
-      {
-        $pull: {
-          members: req.params.memberId,
-          notificationDays: { user: req.params.memberId },
-        },
-      }
-    );
+/**
+ * Remove a member from a location
+ */
+export const removeMember = catchAsync(async (req, res, next) => {
+  await LocationModel.removeMember(
+    req.user,
+    req.params.id,
+    req.params.memberId
+  );
 
-    if (updatedLocation.matchedCount < 1) {
-      return next(
-        DatabaseErrors.NOT_FOUND(
-          "A location with this id does not exist or you do not have permission to modify it."
-        )
-      );
-    }
-
-    // Delete items in this location owned by the removed member
-    await ItemModel.deleteMany({
-      owner: req.params.memberId,
-      location: req.params.id,
-    });
-
-    res
-      .status(200)
-      .send({ message: `Location ${req.params.id} updated successfully.` });
-  },
-  [LocationModel, "update"]
-);
+  res
+    .status(200)
+    .send({ message: `Location ${req.params.id} updated successfully.` });
+});

@@ -96,22 +96,21 @@ ItemSchema.virtual("expired").get(function (this: HydratedDocument<Item>) {
 
 /**
  * See if a user is authorized to access an item. Users are authorized if:
- * - They own or are a member of the location containing the item (all)
+ * - They are authorized to update the location the item belongs to (all)
  * @param authId The user id to check.
  * @param mode The auth mode to authorize for.
  * @param cb Callback with the authorized query.
  */
 ItemSchema.statics.authorize = function (
-  authId: string,
+  auth: Express.User,
   mode: AuthModes,
   cb: (err: ErrorResponse, query: ItemQuery) => void
 ) {
-  LocationModel.find({ $or: [{ members: authId }, { owner: authId }] })
-    .distinct("_id")
-    .then((locations) => {
-      cb(null, this.find({ location: { $in: locations } }));
-    })
-    .catch((error) => cb(error, null));
+  LocationModel.authorize(auth, "update", async (err, query) => {
+    if (err) return cb(err, null);
+    const locations: string[] = await query.distinct("_id");
+    cb(null, this.find({ location: { $in: locations } }));
+  });
 };
 
 /**
@@ -122,14 +121,12 @@ ItemSchema.statics.authorize = function (
  * @param data The data to create the item with.
  */
 ItemSchema.statics.createAuthorized = async function (
-  authId: string,
+  auth: Express.User,
   data: Partial<Item>
 ) {
   return new Promise((resolve, reject) => {
-    LocationModel.authorize(authId, "update", async (err, query) => {
-      if (err) {
-        return reject(err);
-      }
+    LocationModel.authorize(auth, "update", async (err, query) => {
+      if (err) return reject(err);
 
       try {
         const canAccessLocation = await query
@@ -146,7 +143,7 @@ ItemSchema.statics.createAuthorized = async function (
 
         const item = await ItemModel.create({
           ...data,
-          owner: authId,
+          owner: auth._id,
         });
 
         resolve(item);

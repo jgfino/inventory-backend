@@ -11,7 +11,6 @@ const router = express.Router();
  * Get a user's public profile information. Public information includes:
  * - id, name, photoUrl
  * - Mutual locations
- * - Owned items in mutual locations
  */
 router.get("/:id/profile", users.getUserProfile);
 

@@ -1,3 +1,5 @@
+import { Types } from "mongoose";
+
 /**
  * The full type for a User.
  */
@@ -38,6 +40,16 @@ export interface User {
    * expires
    */
   was_subscribed: boolean;
+
+  /**
+   * The user's oldest owned Location.
+   */
+  defaultLocation: Types.ObjectId;
+
+  /**
+   * The location this user has been a member of the longest
+   */
+  defaultSharedLocation: Types.ObjectId;
 
   /**
    * The 6 digit code used to verify a user's email/phone number. Also used

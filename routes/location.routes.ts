@@ -10,7 +10,7 @@ router.post("/", locations.createLocation);
 
 /**
  * Get all locations. Filter by owner id. Search by location
- * name. Populates owner field for display. Sorted by name
+ * name. Populates owner field for display.
  */
 router.get("/", locations.getLocations);
 

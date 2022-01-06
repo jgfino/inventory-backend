@@ -16,10 +16,8 @@ passport.use(
   "jwt",
   new JWTStrategy(jwtOpts, async (payload, done) => {
     try {
-      //TODO: determine/change user's subscription status
-
-      payload.user.subscribed = false;
-      return done(null, payload.user);
+      const user = await UserModel.findById(payload.user._id).lean();
+      return done(null, user);
     } catch (err) {
       return done(err);
     }

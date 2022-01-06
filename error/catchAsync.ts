@@ -55,7 +55,7 @@ export function authorizeAndCatchAsync<T extends AuthTuple[]>(
   return (req: Request, res: Response, next: NextFunction) => {
     async
       .mapSeries<AuthTuple, AnyQueryChain, Error>(models, (model, callback) => {
-        model[0].authorize(req.user._id, model[1], (err, query) => {
+        model[0].authorize(req.user, model[1], (err, query) => {
           if (err) {
             return callback(err);
           } else {

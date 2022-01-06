@@ -93,13 +93,11 @@ interface UserModel extends Model<User, {}, UserInstanceMethods> {
   ): Promise<HydratedDocument<User, UserInstanceMethods>>;
 
   /**
-   * Get the private profile details for this user, including populated
-   * location membership
-   * @param id The user id to get.
+   * Determine if the user with the given ID is a premium user
+   * @param id The id of the user to check
+   * @returns True if the user is a premium member
    */
-  getPrivateProfile(
-    id: string
-  ): Promise<HydratedDocument<User, UserInstanceMethods>>;
+  verifySubscription(id: string): Promise<boolean>;
 }
 
 //#endregion
@@ -154,6 +152,14 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       type: Boolean,
       required: true,
       default: false,
+    },
+    defaultLocation: {
+      type: Schema.Types.ObjectId,
+      ref: "Location",
+    },
+    defaultSharedLocation: {
+      type: Schema.Types.ObjectId,
+      ref: "Location",
     },
     account_verification_code: {
       type: {
@@ -386,12 +392,9 @@ UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
   return user;
 };
 
-// Get detailed profile information for a user
-UserSchema.statics.getPrivateProfile = async function (id: string) {
-  return await this.findById(id).populate(
-    "ownedLocations",
-    "_id name owner.name owner._id owner.photoUrl"
-  );
+UserSchema.statics.verifySubscription = async function (id: string) {
+  // TODO: receipt validation
+  return false;
 };
 
 //#endregion
