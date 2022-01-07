@@ -161,6 +161,10 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       type: Schema.Types.ObjectId,
       ref: "Location",
     },
+    defaultShoppingList: {
+      type: Schema.Types.ObjectId,
+      ref: "ShoppingList",
+    },
     account_verification_code: {
       type: {
         code: String,

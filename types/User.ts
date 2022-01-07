@@ -52,6 +52,11 @@ export interface User {
   defaultSharedLocation: Types.ObjectId;
 
   /**
+   * The user's default shopping list
+   */
+  defaultShoppingList: Types.ObjectId;
+
+  /**
    * The 6 digit code used to verify a user's email/phone number. Also used
    * for 2FA.
    */

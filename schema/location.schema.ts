@@ -132,8 +132,9 @@ LocationSchema.pre("remove", async function (next) {
  *  - They are a member of a premium member's location AND it is the first premium location that they joined (view, update)
  * Premium:
  *  - They are the owner of a location (view, update, delete)
- *  - They are a member of a location (view, update)
+ *  - They are a member of a premium member's location (view, update)
  * @param auth The user to check
+ * @param mode: The auth mode to use
  * @param cb Callback with the authorized query
  */
 LocationSchema.statics.authorize = function (
@@ -157,7 +158,7 @@ LocationSchema.statics.authorize = function (
 
       // Restrict to free Locations
       if (!isPremium) {
-        query = this.find({
+        query = query.find({
           $and: [
             {
               _id: { $in: [auth.defaultLocation, auth.defaultSharedLocation] },
@@ -224,10 +225,10 @@ LocationSchema.statics.createAuthorized = async function (
 
   const newLocation = await LocationModel.create({
     ...data,
-    owner: auth._id,
+    owner: id,
     notificationDays: [
       {
-        user: auth._id,
+        user: id,
         days: [],
       },
     ],
