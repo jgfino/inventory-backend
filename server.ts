@@ -3,7 +3,7 @@ import { User as MongoUser } from "./types/User";
 declare global {
   namespace Express {
     interface User extends MongoUser {
-      _id: string;
+      _id: Types.ObjectId;
     }
     interface Response {
       sendNotFoundError(msg: String): void;
@@ -19,7 +19,7 @@ import express, { NextFunction, Request, Response } from "express";
 import cron from "node-cron";
 
 import passport from "./passport/setup";
-import mongoose, { HydratedDocument } from "mongoose";
+import mongoose, { HydratedDocument, Types } from "mongoose";
 
 import UserModel from "./schema/user.schema";
 import LocationModel from "./schema/location.schema";

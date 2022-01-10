@@ -1,12 +1,11 @@
-import { model, Schema, Types } from "mongoose";
+import { FilterQuery, model, Schema } from "mongoose";
 import { Location } from "../types/Location";
-import ErrorResponse from "../error/ErrorResponse";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
-import ItemModel from "./item.schema";
 import AuthErrors from "../error/errors/auth.errors";
+import { BaseUserSchema, BaseUserWithExpirySchema } from "./baseUser.schema";
+import ItemSchema from "./item.schema";
 import UserModel from "./user.schema";
-import DatabaseErrors from "../error/errors/database.errors";
 
 //#region Types
 
@@ -23,10 +22,7 @@ interface LocationVirtuals {
  * The location model w/static methods
  */
 interface LocationModel
-  extends AuthorizableModel<Location, {}, {}, LocationVirtuals> {
-  addMember(auth: Express.User, id: string): Promise<void>;
-  removeMember(auth: Express.User, id: string, userId: string): Promise<void>;
-}
+  extends AuthorizableModel<Location, {}, {}, LocationVirtuals> {}
 
 //#endregion
 
@@ -35,7 +31,7 @@ interface LocationModel
 /**
  * Location schema definition
  */
-const LocationSchema = new Schema<Location, LocationModel, {}>(
+const LocationSchema = new Schema<Location, LocationModel, {}, {}>(
   {
     name: {
       type: String,
@@ -47,19 +43,8 @@ const LocationSchema = new Schema<Location, LocationModel, {}>(
       required: [true, "Location icon required"],
       maxlength: 100,
     },
-    owner: {
-      type: Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      autopopulate: { select: "_id name photoUrl" },
-    },
-    members: [
-      {
-        type: Types.ObjectId,
-        required: true,
-        ref: "User",
-      },
-    ],
+    owner: BaseUserWithExpirySchema,
+    members: [BaseUserSchema],
     notificationDays: [
       {
         type: {
@@ -73,6 +58,7 @@ const LocationSchema = new Schema<Location, LocationModel, {}>(
         _id: false,
       },
     ],
+    items: [ItemSchema],
   },
   {
     timestamps: true,
@@ -81,22 +67,19 @@ const LocationSchema = new Schema<Location, LocationModel, {}>(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
+        delete ret.owner?.subscription_expires;
       },
       virtuals: true,
     },
     toObject: { virtuals: true },
   }
 );
-LocationSchema.plugin(require("mongoose-autopopulate"));
 
 //#region Virtuals
 
 // Determine the number of items in this location
-LocationSchema.virtual("numItems", {
-  ref: "Item",
-  localField: "_id",
-  foreignField: "location",
-  count: true,
+LocationSchema.virtual("numItems").get(function (this: Location) {
+  return this.items?.length ?? undefined;
 });
 
 //#endregion
@@ -105,9 +88,6 @@ LocationSchema.virtual("numItems", {
 
 // Delete related items and reset user defaults when removing a location
 LocationSchema.pre("remove", async function (next) {
-  // Delete items in this location
-  await ItemModel.deleteMany({ location: this._id });
-
   // Remove this location as a user's default personal/shared
   await UserModel.updateMany(
     { defaultLocation: this._id },
@@ -117,7 +97,6 @@ LocationSchema.pre("remove", async function (next) {
     { defaultSharedLocation: this._id },
     { $unset: { defaultSharedLocation: "" } }
   );
-
   next();
 });
 
@@ -126,70 +105,75 @@ LocationSchema.pre("remove", async function (next) {
 //#region Static methods
 
 /**
- * See if a user is authorized to view a location. Users are authorized if:
+ * See if a user is authorized for a location. Users are authorized if:
  * Free:
- *  - They are the owner of a location, and it is their first location (view, update, delete)
- *  - They are a member of a premium member's location AND it is the first premium location that they joined (view, update)
+ *  - Delete: The user owns the location
+ *  - Update: The location is their default location OR the location is their default shared location AND its owner has an active subscription
+ *  - View:   The user owns the location OR the location is their default shared location (regardless of owner sub status)
  * Premium:
- *  - They are the owner of a location (view, update, delete)
- *  - They are a member of a premium member's location (view, update)
+ *  - Delete: The user owns the location
+ *  - Update: The user owns the location OR the user is a member of the location AND its owner has an active subscription
+ *  - View: The user owns or is a member of the location (regardless of owner sub status)
  * @param auth The user to check
- * @param mode: The auth mode to use
- * @param cb Callback with the authorized query
+ * @param mode The auth mode to use
  */
 LocationSchema.statics.authorize = function (
   auth: Express.User,
-  mode: AuthModes,
-  cb: (err: ErrorResponse, query: LocationQuery) => void
+  mode: AuthModes
 ) {
-  const id = auth._id;
-  UserModel.verifySubscription(id)
-    .then((isPremium) => {
-      let query = this.find(
-        {},
-        {
-          notificationDays: { $elemMatch: { user: id } },
-          name: 1,
-          iconName: 1,
-          owner: 1,
-          members: 1,
-        }
-      );
+  const userId = auth._id;
+  const isPremium = UserModel.isPremium(auth);
 
-      // Restrict to free Locations
-      if (!isPremium) {
-        query = query.find({
-          $and: [
-            {
-              _id: { $in: [auth.defaultLocation, auth.defaultSharedLocation] },
-            },
+  const isDefaultLocation = { _id: auth.defaultLocation ?? null };
+  const isDefaultSharedLocation = { _id: auth.defaultSharedLocation ?? null };
+
+  const owned = { "owner._id": userId };
+  const isMember = { "members._id": userId };
+
+  const ownerIsSubscribed = {
+    "owner.subscription_expires": { $gt: new Date() },
+  };
+
+  let query: FilterQuery<Location>;
+
+  if (!isPremium) {
+    switch (mode) {
+      case "delete":
+        query = owned;
+        break;
+      case "update":
+        query = {
+          $or: [
+            isDefaultLocation,
+            { $and: [isDefaultSharedLocation, ownerIsSubscribed] },
           ],
-        });
-      }
+        };
+        break;
+      case "view":
+        query = { $or: [owned, isDefaultSharedLocation] };
+        break;
+    }
+  } else {
+    switch (mode) {
+      case "delete":
+        query = owned;
+        break;
+      case "update":
+        query = { $or: [owned, { $and: [isMember, ownerIsSubscribed] }] };
+        break;
+      case "view":
+        query = { $or: [owned, isMember] };
+    }
+  }
 
-      switch (mode) {
-        case "delete":
-          query = query.find({ owner: id });
-          break;
-        case "update":
-          query = query.find({ $or: [{ owner: id }, { members: id }] });
-          break;
-        case "view":
-          query = query
-            .find({ $or: [{ owner: id }, { members: id }] })
-            .populate("numItems");
-          break;
-      }
-      cb(null, query);
-    })
-    .catch((err) => cb(err, null));
+  return this.find(query);
 };
 
 /**
  * Create a location safely. Sets the owner to the requesting user id.
  * Locations can be created if:
  * Free:
- *  - A user has no owned locations, and the given name is either fridge or pantry
+ *  - A user has no owned locations, and the given icon is either fridge or pantry
  * Premium:
  *  - Always
  * @param auth The user id to create with.
@@ -200,7 +184,7 @@ LocationSchema.statics.createAuthorized = async function (
   data: Partial<Location>
 ) {
   const id = auth._id;
-  const isPremium = await UserModel.verifySubscription(id);
+  const isPremium = UserModel.isPremium(auth);
 
   if (!isPremium) {
     if (auth.defaultLocation) {
@@ -225,7 +209,12 @@ LocationSchema.statics.createAuthorized = async function (
 
   const newLocation = await LocationModel.create({
     ...data,
-    owner: id,
+    owner: {
+      _id: id,
+      name: auth.name,
+      photoUrl: auth.photoUrl,
+      subscription_expires: auth.subscription_expires,
+    },
     notificationDays: [
       {
         user: id,

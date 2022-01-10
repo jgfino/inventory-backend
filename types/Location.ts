@@ -1,5 +1,7 @@
 import { Types } from "mongoose";
+import { Item } from "./Item";
 import TimestampType from "./TimestampType";
+import { BaseUser, BaseUserWithExpiry } from "./User";
 
 /**
  * Represents a Location which users can add items to.
@@ -14,13 +16,13 @@ export interface Location extends TimestampType {
    */
   iconName: string;
   /**
-   * The user id of the owner of the Location
+   * The owner of the Location
    */
-  owner: Types.ObjectId;
+  owner: BaseUserWithExpiry;
   /**
    * The user ids of the members of the Location
    */
-  members: Types.Array<Types.ObjectId>;
+  members: Types.Array<BaseUser>;
   /**
    * When to notify different users about items in this location expiring
    */
@@ -34,4 +36,8 @@ export interface Location extends TimestampType {
      */
     days: Types.Array<number>;
   }>;
+  /**
+   * The items in this Location
+   */
+  items: Types.Array<Item>;
 }

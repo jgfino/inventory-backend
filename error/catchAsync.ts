@@ -36,13 +36,6 @@ type AuthTuple = readonly [AnyAuthorizableModel, AuthModes];
 type TupleToQuery<T> = T extends AuthTuple ? ModelToQuery<T[0]> : never;
 type TuplesToQueries<T> = { [K in keyof T]: TupleToQuery<T[K]> };
 
-/**
- * Authorize the passed models with the given auth mode and catch async errors
- * to avoid using try/catch.
- * @param fn The function to catch errors for.
- * @param models The models to authorize, paired with their auth mode.
- * @returns An express-style req, res, next function
- */
 export function authorizeAndCatchAsync<T extends AuthTuple[]>(
   fn: (
     req: Request,
@@ -53,18 +46,10 @@ export function authorizeAndCatchAsync<T extends AuthTuple[]>(
   ...models: T
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
-    async
-      .mapSeries<AuthTuple, AnyQueryChain, Error>(models, (model, callback) => {
-        model[0].authorize(req.user, model[1], (err, query) => {
-          if (err) {
-            return callback(err);
-          } else {
-            return callback(null, query);
-          }
-        });
-      })
-      .then((queries) => fn(req, res, next, ...(queries as TuplesToQueries<T>)))
-      .catch(next);
+    const mappedModels = models.map((tuple) => {
+      return tuple[0].authorize(req.user, tuple[1]);
+    });
+    fn(req, res, next, ...(mappedModels as TuplesToQueries<T>)).catch(next);
   };
 }
 

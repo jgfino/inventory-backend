@@ -1,19 +1,35 @@
 import { Types } from "mongoose";
+import TimestampType from "./TimestampType";
+
+/**
+ * The stripped verison of a User stored in documents for display
+ */
+export interface BaseUser {
+  /**
+   * The id of the user
+   */
+  _id: Types.ObjectId;
+  /**
+   * The name of the user
+   */
+  name: string;
+  /**
+   * The photo url of the user
+   */
+  photoUrl: string;
+}
+
+export interface BaseUserWithExpiry extends BaseUser {
+  /**
+   * When the user's subscription expires, if applicable
+   */
+  subscription_expires: Date;
+}
 
 /**
  * The full type for a User.
  */
-export interface User {
-  /**
-   * The name/username of the User.
-   */
-  name: string;
-
-  /**
-   * The URL to the User's profile photo.
-   */
-  photoUrl: string;
-
+export interface User extends Omit<BaseUserWithExpiry, "_id">, TimestampType {
   /**
    * The user's email.
    */
@@ -33,13 +49,6 @@ export interface User {
    * Whether the user has verified their phone number.
    */
   phone_verified: boolean;
-
-  /**
-   * Whether this user ever had an active subscription. Used client-side
-   * for explaining loss of access to items/locations when subscription
-   * expires
-   */
-  was_subscribed: boolean;
 
   /**
    * The user's oldest owned Location.

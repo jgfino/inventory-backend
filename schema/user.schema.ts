@@ -1,5 +1,5 @@
 import { HydratedDocument, Model, model, Schema } from "mongoose";
-import { User } from "../types/User";
+import { BaseUser, BaseUserWithExpiry, User } from "../types/User";
 import bcrypt from "bcryptjs";
 import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import LocationModel from "./location.schema";
@@ -8,7 +8,7 @@ import validator from "validator";
 import crypto from "crypto";
 import AuthErrors from "../error/errors/auth.errors";
 import DatabaseErrors from "../error/errors/database.errors";
-import ItemModel from "./item.schema";
+import ShoppingListModel from "./shoppingList.schema";
 
 //#region Types
 
@@ -97,7 +97,7 @@ interface UserModel extends Model<User, {}, UserInstanceMethods> {
    * @param id The id of the user to check
    * @returns True if the user is a premium member
    */
-  verifySubscription(id: string): Promise<boolean>;
+  isPremium(user: BaseUserWithExpiry): boolean;
 }
 
 //#endregion
@@ -148,10 +148,8 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       type: Boolean,
       default: false,
     },
-    was_subscribed: {
-      type: Boolean,
-      required: true,
-      default: false,
+    subscription_expires: {
+      type: Date,
     },
     defaultLocation: {
       type: Schema.Types.ObjectId,
@@ -221,8 +219,8 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
 
 //#region Middleware
 
-// Hash password before saving
-UserSchema.pre("save", function (next) {
+// Hash password before saving. Update user fields in other documents
+UserSchema.pre("save", async function (next) {
   if (this.isModified("password")) {
     const hash = bcrypt.hashSync(this.password, 10);
     this.password = hash;
@@ -234,6 +232,74 @@ UserSchema.pre("save", function (next) {
 
   if (this.isModified("phone")) {
     this.phone_verified = false;
+  }
+
+  if (!this.isNew) {
+    if (this.isModified("name")) {
+      await LocationModel.updateMany(
+        { "owner.id": this.id },
+        { "owner.name": this.name }
+      );
+
+      await LocationModel.updateMany(
+        { "members.id": this.id },
+        { "members.$.name": this.name }
+      );
+
+      await ShoppingListModel.updateMany(
+        { "owner.id": this.id },
+        { "owner.name": this.name }
+      );
+
+      await ShoppingListModel.updateMany(
+        { "members.id": this.id },
+        { "members.$.name": this.name }
+      );
+    }
+
+    if (this.isModified("photoUrl")) {
+      await LocationModel.updateMany(
+        { "owner.id": this.id },
+        { "owner.photoUrl": this.photoUrl }
+      );
+
+      await LocationModel.updateMany(
+        { "members.id": this.id },
+        { "members.$.photoUrl": this.photoUrl }
+      );
+
+      await ShoppingListModel.updateMany(
+        { "owner.id": this.id },
+        { "owner.photoUrl": this.photoUrl }
+      );
+
+      await ShoppingListModel.updateMany(
+        { "members.id": this.id },
+        { "members.$.photoUrl": this.photoUrl }
+      );
+    }
+
+    if (this.isModified("subscription_expires")) {
+      await LocationModel.updateMany(
+        { "owner.id": this.id },
+        { "owner.subscription_expires": this.subscription_expires }
+      );
+
+      await LocationModel.updateMany(
+        { "members.id": this.id },
+        { "members.$.subscription_expires": this.subscription_expires }
+      );
+
+      await LocationModel.updateMany(
+        { "owner.id": this.id },
+        { "owner.subscription_expires": this.subscription_expires }
+      );
+
+      await LocationModel.updateMany(
+        { "members.id": this.id },
+        { "members.$.subscription_expires": this.subscription_expires }
+      );
+    }
   }
 
   next();
@@ -307,7 +373,12 @@ UserSchema.pre("remove", async function (next) {
   );
 
   // Delete items owned by this user
-  promises.push(ItemModel.deleteMany({ owner: this._id }).exec());
+  promises.push(
+    LocationModel.updateMany(
+      { "items.owner.id": this.id },
+      { $pull: { items: { "owner.id": this.id } } }
+    ).exec()
+  );
 
   // Await async operations
   await Promise.all(promises);
@@ -396,9 +467,8 @@ UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
   return user;
 };
 
-UserSchema.statics.verifySubscription = async function (id: string) {
-  // TODO: receipt validation
-  return false;
+UserSchema.statics.isPremium = function (user: BaseUserWithExpiry) {
+  return user.subscription_expires > new Date();
 };
 
 //#endregion
@@ -425,7 +495,7 @@ UserSchema.methods.generateTokens = async function () {
   );
 
   const accessToken = jwt.sign({ user: body }, process.env.JWT_SECRET!, {
-    expiresIn: "15 minutes",
+    expiresIn: "1 hour", // TODO: 15 mins
   });
 
   this.refresh_token_secret = bcrypt.hashSync(refreshSecret, 10);

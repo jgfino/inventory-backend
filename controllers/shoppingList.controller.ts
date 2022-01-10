@@ -1,9 +1,10 @@
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import AuthErrors from "../error/errors/auth.errors";
 import DatabaseErrors from "../error/errors/database.errors";
-import ItemModel from "../schema/item.schema";
 import ShoppingListModel from "../schema/shoppingList.schema";
 import UserModel from "../schema/user.schema";
+import { ShoppingListItem } from "../types/ShoppingList";
+import { BaseUser } from "../types/User";
 
 export const createList = catchAsync(async (req, res, next) => {
   const list = await ShoppingListModel.createAuthorized(req.user, req.body);
@@ -21,6 +22,13 @@ export const getLists = authorizeAndCatchAsync(
 export const getList = authorizeAndCatchAsync(
   async (req, res, next, listModel) => {
     const list = await listModel.findOne({ _id: req.params.id });
+    if (!list) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A Shopping List with this id does not exist or you do not have permission to view it."
+        )
+      );
+    }
     res.status(200).send(list);
   },
   [ShoppingListModel, "view"]
@@ -78,10 +86,16 @@ export const deleteList = authorizeAndCatchAsync(
 export const addItem = authorizeAndCatchAsync(
   async (req, res, next, listModel) => {
     const { name, notes, checked } = req.body;
-    const newItem = {
+
+    const newItem: ShoppingListItem = {
       name: name,
       notes: notes,
       checked: checked,
+      owner: {
+        _id: req.user._id,
+        name: req.user.name,
+        photoUrl: req.user.photoUrl,
+      },
     };
 
     const updateResult = await listModel.updateOne(
@@ -137,7 +151,7 @@ export const deleteItem = authorizeAndCatchAsync(
   async (req, res, next, listModel) => {
     const updateResult = await listModel.updateOne(
       { _id: req.params.id },
-      { $pull: { items: req.params.itemId } }
+      { $pull: { "items._id": req.params.itemId } }
     );
 
     if (updateResult.matchedCount < 1) {
@@ -157,7 +171,7 @@ export const deleteItem = authorizeAndCatchAsync(
 
 export const addMember = catchAsync(async (req, res, next) => {
   const id = req.user._id;
-  const isPremium = await UserModel.verifySubscription(id);
+  const isPremium = UserModel.isPremium(req.user);
 
   if (!isPremium) {
     return next(
@@ -167,10 +181,20 @@ export const addMember = catchAsync(async (req, res, next) => {
     );
   }
 
-  const owner: string = await ShoppingListModel.findById(id).distinct(
-    "owner"
-  )[0];
-  const ownerIsPremium = await UserModel.verifySubscription(owner);
+  const list = await ShoppingListModel.findOne(
+    { _id: req.params.id, "owner._id": { $ne: id } },
+    "_id owner"
+  ).lean();
+
+  if (!list) {
+    return next(
+      DatabaseErrors.NOT_FOUND(
+        "A ShoppingList with this id does not exist or you do not have permission to add this user to it."
+      )
+    );
+  }
+
+  const ownerIsPremium = UserModel.isPremium(list.owner);
 
   if (!ownerIsPremium) {
     return next(
@@ -180,18 +204,16 @@ export const addMember = catchAsync(async (req, res, next) => {
     );
   }
 
-  const updatedList = await ShoppingListModel.updateOne(
-    { _id: id, owner: { $ne: id } },
-    { $addToSet: { members: id } }
-  );
+  const newMember: BaseUser = {
+    _id: req.user._id,
+    name: req.user.name,
+    photoUrl: req.user.photoUrl,
+  };
 
-  if (updatedList.matchedCount < 1) {
-    return next(
-      DatabaseErrors.NOT_FOUND(
-        "A ShoppingList with this id does not exist or you do not have permission to add this user to it."
-      )
-    );
-  }
+  await ShoppingListModel.updateOne(
+    { _id: id, "owner._id": { $ne: id } },
+    { $addToSet: { members: newMember } }
+  );
 
   res.status(200).send({
     message: `User added to Shopping List ${req.params.id} successfully.`,
@@ -202,7 +224,7 @@ export const removeMember = authorizeAndCatchAsync(
   async (req, res, next, listModel) => {
     const updatedList = await listModel.updateOne(
       { _id: req.params.id },
-      { $pull: { members: req.params.memberId } }
+      { $pull: { "members._id": req.params.memberId } }
     );
 
     if (updatedList.matchedCount < 1) {

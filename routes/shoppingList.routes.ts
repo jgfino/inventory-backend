@@ -47,7 +47,7 @@ router.delete("/:id/items/:itemId", shoppingLists.deleteItem);
 /**
  * Add the requesting user to the given shopping list
  */
-router.post("/:id/members/:memberId", shoppingLists.addMember);
+router.post("/:id/members", shoppingLists.addMember);
 
 /**
  * Remove a member from a shopping list

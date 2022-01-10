@@ -31,7 +31,7 @@ export default interface AuthorizableModel<
    * @param mode The auth mode to use.
    * @param cb Callback with the authorized query
    */
-  authorize(
+  authorize_old(
     auth: Express.User,
     mode: AuthModes,
     cb: (
@@ -39,6 +39,12 @@ export default interface AuthorizableModel<
       query: QueryChain<T, TQueryHelpers, TMethods, TVirtuals>
     ) => any
   ): void;
+
+  authorize(
+    auth: Express.User,
+    mode: AuthModes
+  ): QueryChain<T, TQueryHelpers, TMethods, TVirtuals>;
+
   /**
    * Create a document securely
    * @param authId The user id to use in creation.

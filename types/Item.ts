@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import TimestampType from "./TimestampType";
+import { BaseUser } from "./User";
 
 /**
  * Represents a single Item in a Location.
@@ -20,11 +21,7 @@ export interface Item extends TimestampType {
   /**
    * The user id of the owner of the item
    */
-  owner: Types.ObjectId;
-  /**
-   * The id of the location of the item
-   */
-  location: Types.ObjectId;
+  owner: BaseUser;
   /**
    * The expiration date of the item
    */
