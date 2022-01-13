@@ -1,3 +1,5 @@
+//@ts-nocheck
+
 import { HydratedDocument, Model, model, Schema } from "mongoose";
 import { BaseUser, BaseUserWithExpiry, User } from "../types/User";
 import bcrypt from "bcryptjs";
@@ -246,6 +248,11 @@ UserSchema.pre("save", async function (next) {
         { "members.$.name": this.name }
       );
 
+      await LocationModel.updateMany(
+        { "items.owner._id": this.id },
+        { "items.$.owner.name": this.name }
+      );
+
       await ShoppingListModel.updateMany(
         { "owner.id": this.id },
         { "owner.name": this.name }
@@ -268,6 +275,11 @@ UserSchema.pre("save", async function (next) {
         { "members.$.photoUrl": this.photoUrl }
       );
 
+      await LocationModel.updateMany(
+        { "items.owner._id": this.id },
+        { "items.$.owner.photoUrl": this.photoUrl }
+      );
+
       await ShoppingListModel.updateMany(
         { "owner.id": this.id },
         { "owner.photoUrl": this.photoUrl }
@@ -285,19 +297,9 @@ UserSchema.pre("save", async function (next) {
         { "owner.subscription_expires": this.subscription_expires }
       );
 
-      await LocationModel.updateMany(
-        { "members.id": this.id },
-        { "members.$.subscription_expires": this.subscription_expires }
-      );
-
-      await LocationModel.updateMany(
+      await ShoppingListModel.updateMany(
         { "owner.id": this.id },
         { "owner.subscription_expires": this.subscription_expires }
-      );
-
-      await LocationModel.updateMany(
-        { "members.id": this.id },
-        { "members.$.subscription_expires": this.subscription_expires }
       );
     }
   }
@@ -495,7 +497,7 @@ UserSchema.methods.generateTokens = async function () {
   );
 
   const accessToken = jwt.sign({ user: body }, process.env.JWT_SECRET!, {
-    expiresIn: "1 hour", // TODO: 15 mins
+    expiresIn: "7 days", // TODO: 15 mins
   });
 
   this.refresh_token_secret = bcrypt.hashSync(refreshSecret, 10);

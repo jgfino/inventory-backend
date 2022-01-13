@@ -1,4 +1,4 @@
-import { FilterQuery, model, Schema } from "mongoose";
+import { Document, FilterQuery, model, Schema } from "mongoose";
 import { Location } from "../types/Location";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
@@ -6,23 +6,16 @@ import AuthErrors from "../error/errors/auth.errors";
 import { BaseUserSchema, BaseUserWithExpirySchema } from "./baseUser.schema";
 import ItemSchema from "./item.schema";
 import UserModel from "./user.schema";
+import { Item } from "../types/Item";
 
 //#region Types
 
-type LocationQuery = QueryChain<Location, {}, {}, LocationVirtuals>;
-
-interface LocationVirtuals {
-  /**
-   * The number of items in this location
-   */
-  numItems: number;
-}
+type LocationQuery = QueryChain<Location>;
 
 /**
  * The location model w/static methods
  */
-interface LocationModel
-  extends AuthorizableModel<Location, {}, {}, LocationVirtuals> {}
+interface LocationModel extends AuthorizableModel<Location> {}
 
 //#endregion
 
@@ -43,31 +36,52 @@ const LocationSchema = new Schema<Location, LocationModel, {}, {}>(
       required: [true, "Location icon required"],
       maxlength: 100,
     },
-    owner: BaseUserWithExpirySchema,
+    owner: {
+      type: BaseUserWithExpirySchema,
+      required: true,
+    },
     members: [BaseUserSchema],
     notificationDays: [
       {
-        type: {
-          user: Schema.Types.ObjectId,
-          days: [
-            {
-              type: Number,
-            },
-          ],
+        user: {
+          type: Schema.Types.ObjectId,
+          required: true,
         },
+        days: [
+          {
+            type: Number,
+            required: true,
+            default: [],
+          },
+        ],
         _id: false,
       },
     ],
     items: [ItemSchema],
+    notes: {
+      type: String,
+      maxlength: 300,
+    },
   },
   {
     timestamps: true,
     toJSON: {
       transform: (doc, ret) => {
-        ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
-        delete ret.owner?.subscription_expires;
+
+        if (ret.notificationDays) {
+          ret.notificationDays = ret.notificationDays[0]?.days;
+        }
+
+        const items: Document<any, any, Item>[] = ret.items;
+        if (!items || items.length < 1) {
+          return;
+        }
+
+        if (Object.keys(items[0]).length == 1) {
+          ret.items = items.map((item) => item.id);
+        }
       },
       virtuals: true,
     },
@@ -75,18 +89,9 @@ const LocationSchema = new Schema<Location, LocationModel, {}, {}>(
   }
 );
 
-//#region Virtuals
-
-// Determine the number of items in this location
-LocationSchema.virtual("numItems").get(function (this: Location) {
-  return this.items?.length ?? undefined;
-});
-
-//#endregion
-
 //#region Middleware
 
-// Delete related items and reset user defaults when removing a location
+// Reset user defaults when removing a location
 LocationSchema.pre("remove", async function (next) {
   // Remove this location as a user's default personal/shared
   await UserModel.updateMany(
@@ -167,71 +172,6 @@ LocationSchema.statics.authorize = function (
   }
 
   return this.find(query);
-};
-
-/**
- * Create a location safely. Sets the owner to the requesting user id.
- * Locations can be created if:
- * Free:
- *  - A user has no owned locations, and the given icon is either fridge or pantry
- * Premium:
- *  - Always
- * @param auth The user id to create with.
- * @param data The data to create with.
- */
-LocationSchema.statics.createAuthorized = async function (
-  auth: Express.User,
-  data: Partial<Location>
-) {
-  const id = auth._id;
-  const isPremium = UserModel.isPremium(auth);
-
-  if (!isPremium) {
-    if (auth.defaultLocation) {
-      return Promise.reject(
-        AuthErrors.PREMIUM_FEATURE(
-          "A paid account is required to create more than one Location"
-        )
-      );
-    }
-
-    if (
-      data.iconName.toLowerCase() != "fridge" &&
-      data.iconName.toLowerCase() != "pantry"
-    ) {
-      return Promise.reject(
-        AuthErrors.PREMIUM_FEATURE(
-          "Only Pantry and Fridge Locations can be created with a free account"
-        )
-      );
-    }
-  }
-
-  const newLocation = await LocationModel.create({
-    ...data,
-    owner: {
-      _id: id,
-      name: auth.name,
-      photoUrl: auth.photoUrl,
-      subscription_expires: auth.subscription_expires,
-    },
-    notificationDays: [
-      {
-        user: id,
-        days: [],
-      },
-    ],
-  });
-
-  // If this is the user's first Location, specify this
-  if (!auth.defaultLocation) {
-    await UserModel.updateOne(
-      { _id: id },
-      { defaultLocation: newLocation._id }
-    );
-  }
-
-  return newLocation;
 };
 
 //#endregion

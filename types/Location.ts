@@ -20,13 +20,13 @@ export interface Location extends TimestampType {
    */
   owner: BaseUserWithExpiry;
   /**
-   * The user ids of the members of the Location
+   * The members of the Location
    */
   members: Types.Array<BaseUser>;
   /**
    * When to notify different users about items in this location expiring
    */
-  notificationDays?: Types.Array<{
+  notificationDays: Types.Array<{
     /**
      * The user id to notify
      */
@@ -40,4 +40,8 @@ export interface Location extends TimestampType {
    * The items in this Location
    */
   items: Types.Array<Item>;
+  /**
+   * Any notes about this Location
+   */
+  notes?: string;
 }

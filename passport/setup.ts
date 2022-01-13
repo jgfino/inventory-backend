@@ -16,7 +16,15 @@ passport.use(
   "jwt",
   new JWTStrategy(jwtOpts, async (payload, done) => {
     try {
-      const user = await UserModel.findById(payload.user._id).lean();
+      const user = await UserModel.findById(payload.user._id, {
+        _id: 1,
+        name: 1,
+        photoUrl: 1,
+        subscription_expires: 1,
+        defaultLocation: 1,
+        defaultSharedLocation: 1,
+        defaultShoppingList: 1,
+      }).lean();
       return done(null, user);
     } catch (err) {
       return done(err);

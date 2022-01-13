@@ -1,11 +1,10 @@
 import { Types } from "mongoose";
-import TimestampType from "./TimestampType";
 import { BaseUser } from "./User";
 
 /**
  * Represents a single Item in a Location.
  */
-export interface Item extends TimestampType {
+export interface Item {
   /**
    * The name of the item
    */
@@ -19,9 +18,13 @@ export interface Item extends TimestampType {
    */
   iconName: string;
   /**
-   * The user id of the owner of the item
+   * The owner of the item
    */
   owner: BaseUser;
+  /**
+   * When this item was added to the location
+   */
+  added: Date;
   /**
    * The expiration date of the item
    */

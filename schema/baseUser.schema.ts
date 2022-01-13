@@ -12,6 +12,7 @@ export const BaseUserSchema = new Schema<BaseUser, BaseUserModel, {}>(
     _id: {
       type: Schema.Types.ObjectId,
       ref: "User",
+      required: true,
     },
     name: {
       type: String,
@@ -25,9 +26,9 @@ export const BaseUserSchema = new Schema<BaseUser, BaseUserModel, {}>(
     },
   },
   {
-    _id: false,
     toJSON: {
       transform: (doc, ret) => {
+        delete ret._id;
         delete ret.__v;
       },
       virtuals: true,
@@ -61,10 +62,11 @@ export const BaseUserWithExpirySchema = new Schema<
     },
   },
   {
-    _id: false,
     toJSON: {
       transform: (doc, ret) => {
+        delete ret._id;
         delete ret.__v;
+        delete ret.subscription_expires;
       },
       virtuals: true,
     },

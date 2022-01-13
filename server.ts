@@ -1,9 +1,11 @@
-import { User as MongoUser } from "./types/User";
+import { BaseUser, BaseUserWithExpiry } from "./types/User";
 
 declare global {
   namespace Express {
-    interface User extends MongoUser {
-      _id: Types.ObjectId;
+    interface User extends BaseUser, BaseUserWithExpiry {
+      defaultLocation: Types.ObjectId;
+      defaultSharedLocation: Types.ObjectId;
+      defaultShoppingList: Types.ObjectId;
     }
     interface Response {
       sendNotFoundError(msg: String): void;
@@ -31,9 +33,6 @@ import users from "./routes/user.routes";
 import profiles from "./routes/profile.routes";
 import items from "./routes/items.routes";
 import ErrorResponse from "./error/ErrorResponse";
-
-var _ = require("lodash");
-global._ = _;
 
 var app = express();
 
@@ -70,6 +69,11 @@ app.use(function (req, res, next) {
 });
 
 const jwtAuth = passport.authenticate("jwt", { session: false });
+
+app.use(express.static("public"));
+app.use("/docs", (req, res) => {
+  res.sendFile("/Users/julia/Documents/VSCode/inventory-server/rapidoc.html");
+});
 
 app.use("/api/v1/auth", auth);
 app.use("/api/v1/profile", jwtAuth, profiles);

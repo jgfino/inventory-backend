@@ -4,84 +4,77 @@ import express from "express";
 const router = express.Router();
 
 /**
- * Locations
- */
-
-/**
- * Create a location
+ * POST /api/v1/locations
  */
 router.post("/", locations.createLocation);
 
 /**
- * Get all locations. Filter by owner id. Search by location
- * name. Populates owner field for display.
+ * GET /api/v1/locations
  */
 router.get("/", locations.getLocations);
 
 /**
- * Get a location with the given id.
+ * GET /api/v1/locations/{id}
  */
 router.get("/:id", locations.getLocation);
 
 /**
- * Get a location and its items
- */
-router.get("/:id/details", locations.getLocation);
-
-/**
- * Update the location with the given id. Updatable fields include name,
- * iconName
+ * PUT /api/v1/locations/{id}
  */
 router.put("/:id", locations.updateLocation);
 
 /**
- * Delete the location with the given id.
+ * DELETE /api/v1/locations/{id}
  */
 router.delete("/:id", locations.deleteLocation);
 
 /**
- * Add the requesting user to the given location. Users can only add themselves
- * to a location.
+ * POST /api/v1/locations/{id}/join
  */
-router.post("/:id/members/:memberId", locations.addMember);
+router.post("/:id/join", locations.joinLocation);
 
 /**
- * Remove a member from a location.
+ * POST /api/v1/locations/{id}/leave
+ */
+router.post("/:id/leave", locations.removeMember);
+
+/**
+ * DELETE /api/v1/locations/{id}/members/{memberId}
  */
 router.delete("/:id/members/:memberId", locations.removeMember);
 
-/**
- * Items
- */
+// Items //
 
 /**
- * Add a new item to the given location
+ * POST /api/v1/locations/{id}/items
  */
 router.post("/:id/items", locations.addItem);
 
 /**
- * Get the items in the given locaiton
+ * GET /api/v1/locations/{id}/items
  */
 router.get("/:id/items", locations.getItems);
 
 /**
- * Search all locations for items. Returns locations containing matching items
- */
-router.get("/search", locations.searchItems);
-
-/**
- * Get an item in a location.
+ * GET /api/v1/locations/{id}/items/{itemId}
  */
 router.get("/:id/items/:item", locations.getItem);
 
 /**
- * Update the given item in the given location
+ * PUT /api/v1/locations/{id}/items/{itemId}
  */
 router.put("/:id/items/:item", locations.updateItem);
 
 /**
- * Delete the given item in the given location
+ * DELETE /api/v1/locations/{id}/items/{itemId}
  */
 router.delete("/:id/items/:item", locations.removeItem);
+
+// Item searching //
+
+/**
+ * GET /api/v1/locations/items
+ */
+router.get("/items/search", locations.searchItems);
 
 export default router;

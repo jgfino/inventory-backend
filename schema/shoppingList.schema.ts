@@ -48,7 +48,10 @@ const ShoppingListSchema = new Schema<ShoppingList, ShoppingListModel, {}>(
     notes: {
       type: String,
     },
-    owner: BaseUserWithExpirySchema,
+    owner: {
+      type: BaseUserWithExpirySchema,
+      required: true,
+    },
     items: [ShoppingListItemSchema],
     members: [BaseUserSchema],
   },
