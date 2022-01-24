@@ -4,27 +4,27 @@ import express from "express";
 const router = express.Router();
 
 /**
- * Sign in a user
+ * POST /api/v1/auth/login
  */
 router.post("/login", auth.login);
 
 /**
- * Register a new user
+ * POST /api/v1/auth/register
  */
 router.post("/register", auth.register);
 
 /**
- * Refresh a user's tokens using an access and refresh token
+ * POST /api/v1/auth/token
  */
 router.post("/token", auth.refreshToken);
 
 /**
- * Send a password reset email/text
+ * POST /api/v1/auth/forgot/{emailOrPhone}
  */
 router.post("/forgot/:emailOrPhone", auth.forgotPassword);
 
 /**
- * Reset a user's password using a token
+ * POST /api/v1/auth/reset/{emailOrPhone}
  */
 router.post("/reset/:emailOrPhone", auth.resetPassword);
 

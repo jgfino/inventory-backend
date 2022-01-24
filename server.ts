@@ -25,7 +25,7 @@ import mongoose, { HydratedDocument, Types } from "mongoose";
 
 import UserModel from "./schema/user.schema";
 import LocationModel from "./schema/location.schema";
-import ItemModel from "./schema/item.schema";
+import ShoppingListModel from "./schema/shoppingList.schema";
 
 import locations from "./routes/location.routes";
 import auth from "./routes/auth.routes";
@@ -41,7 +41,7 @@ const db = {
   url: process.env.MONGODB_URL,
   users: UserModel,
   locations: LocationModel,
-  items: ItemModel,
+  shoppingLists: ShoppingListModel,
 };
 
 db.mongoose

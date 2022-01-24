@@ -1,7 +1,7 @@
 //@ts-nocheck
 
 import { HydratedDocument, Model, model, Schema } from "mongoose";
-import { BaseUser, BaseUserWithExpiry, User } from "../types/User";
+import { BaseUserWithExpiry, User } from "../types/User";
 import bcrypt from "bcryptjs";
 import jwt, { JsonWebTokenError, TokenExpiredError } from "jsonwebtoken";
 import LocationModel from "./location.schema";
@@ -460,10 +460,6 @@ UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
     user = await UserModel.findOne({ email: emailOrPhone });
   } else if (validator.isMobilePhone(emailOrPhone)) {
     user = await UserModel.findOne({ phone: emailOrPhone });
-  }
-
-  if (!user) {
-    return Promise.reject(AuthErrors.USER_NOT_FOUND);
   }
 
   return user;

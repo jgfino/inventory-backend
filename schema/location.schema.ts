@@ -1,23 +1,98 @@
-import { FilterQuery, model, Schema } from "mongoose";
-import { Location } from "../types/Location";
+import { FilterQuery, Model, model, Schema, Types } from "mongoose";
+import { Location, Item } from "../types/Location";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
 import { BaseUserSchema, BaseUserWithExpirySchema } from "./baseUser.schema";
-import ItemSchema from "./item.schema";
 import UserModel from "./user.schema";
 
 //#region Types
 
 type LocationQuery = QueryChain<Location>;
+type ItemQuery = QueryChain<Item>;
 
 /**
  * The location model w/static methods
  */
 interface LocationModel extends AuthorizableModel<Location> {}
 
+/**
+ * Item model with static methods
+ */
+interface ItemModel extends Model<Item> {}
+
 //#endregion
 
 //#region Schema definition
+
+/**
+ * Item Schema definition
+ */
+const ItemSchema = new Schema<Item, ItemModel, {}>(
+  {
+    _id: {
+      type: Schema.Types.ObjectId,
+      required: true,
+    },
+    name: {
+      type: String,
+      required: [true, "Item name is required."],
+      maxlength: 100,
+    },
+    category: {
+      type: String,
+      required: true,
+      default: "Other",
+      maxlength: 100,
+      lowercase: true,
+    },
+    iconName: {
+      type: String,
+      required: [true, "Icon name required"],
+      maxlength: 100,
+    },
+    owner: {
+      type: BaseUserSchema,
+      required: true,
+    },
+    expirationDate: {
+      type: Date,
+    },
+    added: {
+      type: Date,
+    },
+    opened: {
+      type: Date,
+    },
+    purchaseLocation: {
+      type: String,
+      maxlength: 100,
+    },
+    price: {
+      type: Schema.Types.Decimal128,
+      default: new Types.Decimal128("0.00"),
+    },
+    notes: {
+      type: String,
+      maxlength: 300,
+    },
+  },
+  {
+    toJSON: {
+      transform: (doc, ret) => {
+        ret.id = ret._id;
+        delete ret._id;
+        delete ret.__v;
+
+        const price: Types.Decimal128 = ret.price;
+        if (price) {
+          ret.price = price.toString();
+        }
+      },
+      virtuals: true,
+    },
+    toObject: { virtuals: true },
+  }
+);
 
 /**
  * Location schema definition
@@ -195,4 +270,5 @@ const LocationModel = model<Location, LocationModel>(
   LocationSchema
 );
 
+export const ItemModel = model<Item, ItemModel>("Item", ItemSchema);
 export default LocationModel;

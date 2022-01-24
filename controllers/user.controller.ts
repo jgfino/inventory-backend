@@ -3,7 +3,6 @@ import { catchAsync } from "../error/catchAsync";
 import DatabaseErrors from "../error/errors/database.errors";
 import { Types } from "mongoose";
 import LocationModel from "../schema/location.schema";
-import ItemModel from "../schema/item.schema";
 
 /**
  * Get a user's public information

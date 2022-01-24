@@ -5,8 +5,6 @@ import { VerifyEmailTemplate } from "../nodemailer/templates.nodemailer";
 import { sendSMS } from "../twilio/sms";
 import { VerifyPhoneTemplate } from "../twilio/templates.twilio";
 import AuthErrors from "../error/errors/auth.errors";
-import LocationModel from "../schema/location.schema";
-import ItemModel from "../schema/item.schema";
 
 /**
  * Get the currently logged-in user

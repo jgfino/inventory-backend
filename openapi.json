@@ -12,12 +12,226 @@
   ],
   "servers": [
     {
-      "url": "/api/v1"
+      "url": "localhost:8080/api/v1"
     }
   ],
   "paths": {
-    "/login": {
-      "security": []
+    "/auth/login": {
+      "security": [],
+      "post": {
+        "description": "Login a user with an email/phone number and password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["emailOrPhone", "password"],
+                "properties": {
+                  "emailOrPhone": {
+                    "$ref": "#/components/schemas/EmailOrPhone"
+                  },
+                  "password": {
+                    "$ref": "#/components/schemas/Password"
+                  },
+                  "code": {
+                    "type": "integer",
+                    "description": "The 2fa code received by the user. This is required for users with 2fa enabled. Making a POST request to login without a code will trigger a 2fa message to be sent to the user's phone. A secondary request can then be made with the correct code.",
+                    "minimum": 100000,
+                    "maximum": 999999
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's id, access token, and refresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "security": [],
+      "post": {
+        "description": "Register a user with an email/phone number, name, and password. Signs this user in after registration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["emailOrPhone", "password", "name"],
+                "properties": {
+                  "emailOrPhone": {
+                    "$ref": "#/components/schemas/EmailOrPhone"
+                  },
+                  "password": {
+                    "$ref": "#/components/schemas/Password"
+                  },
+                  "name": {
+                    "$ref": "#/components/schemas/Name"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's id, access token, and refresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/auth/token": {
+      "security": [],
+      "post": {
+        "description": "Generate new access and refresh tokens based on the provided ones.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["accessToken", "refreshToken"],
+                "properties": {
+                  "accessToken": {
+                    "$ref": "#/components/schemas/AccessToken"
+                  },
+                  "refreshToken": {
+                    "$ref": "#/components/schemas/RefreshToken"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's id, access token, and refresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/auth/forgot/{emailOrPhone}": {
+      "security": [],
+      "post": {
+        "description": "Send a password reset code to the provided email or phone number.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EmailOrPhone"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/auth/reset/{emailOrPhone}": {
+      "security": [],
+      "post": {
+        "description": "Reset the password or user with the given email or phone using the code they received. Also, log them in.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/EmailOrPhone"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["password", "code"],
+                "properties": {
+                  "password": {
+                    "$ref": "#/components/schemas/Password"
+                  },
+                  "code": {
+                    "$ref": "#/components/schemas/AuthCode"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The user's id, access token, and refresh token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tokens"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
     },
     "/locations": {
       "post": {
@@ -845,6 +1059,62 @@
       }
     },
     "schemas": {
+      "EmailOrPhone": {
+        "type": "string",
+        "description": "The user's email or phone number.",
+        "example": "email@website.com"
+      },
+      "Password": {
+        "type": "string",
+        "description": "The user's password.",
+        "example": "Password*123"
+      },
+      "Name": {
+        "type": "string",
+        "description": "The user's name or username",
+        "example": "jjfino"
+      },
+      "Email": {
+        "type": "string",
+        "description": "The user's email address",
+        "example": "email@website.com"
+      },
+      "Phone": {
+        "type": "string",
+        "description": "The user's phone number with country code.",
+        "example": "+112345678910"
+      },
+      "Tokens": {
+        "type": "object",
+        "required": ["id", "accessToken", "refreshToken"],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "accessToken": {
+            "$ref": "#/components/schemas/AccessToken"
+          },
+          "refreshToken": {
+            "$ref": "#/components/schemas/RefreshToken"
+          }
+        }
+      },
+      "AccessToken": {
+        "type": "string",
+        "description": "The user's access JWT. Expires after 1 hour.",
+        "pattern": "(^[A-Za-z0-9-_]*\\.[A-Za-z0-9-_]*\\.[A-Za-z0-9-_]*$)"
+      },
+      "RefreshToken": {
+        "type": "string",
+        "description": "The user's refresh JWT. Expires after 7 days.",
+        "pattern": "(^[A-Za-z0-9-_]*\\.[A-Za-z0-9-_]*\\.[A-Za-z0-9-_]*$)"
+      },
+      "AuthCode": {
+        "type": "integer",
+        "description": "A 6 digit authentication code.",
+        "minimum": 100000,
+        "maximum": 999999
+      },
       "LocationBasic": {
         "type": "object",
         "required": [
@@ -904,7 +1174,7 @@
           }
         }
       },
-      "LocationBasic": {
+      "LocationBasicValue": {
         "type": "object",
         "required": [
           "id",
@@ -915,6 +1185,7 @@
           "lastOpened",
           "items",
           "members",
+          "totalValue",
           "lastUpdatedBy",
           "createdAt",
           "updatedAt"
@@ -1516,6 +1787,16 @@
           "default": 30,
           "minimum": 0,
           "maximum": 50
+        }
+      },
+      "EmailOrPhone": {
+        "in": "path",
+        "name": "emailOrPhone",
+        "required": true,
+        "description": "The email or phone number to send the reset code to.",
+        "schema": {
+          "type": "string",
+          "example": "email@website.com"
         }
       },
       "OffsetQuery": {

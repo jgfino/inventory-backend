@@ -1,13 +1,12 @@
-import LocationModel from "../schema/location.schema";
+import LocationModel, { ItemModel } from "../schema/location.schema";
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import DatabaseErrors from "../error/errors/database.errors";
 import UserModel from "../schema/user.schema";
 import AuthErrors from "../error/errors/auth.errors";
 import { BaseUser } from "../types/User";
-import { Item } from "../types/Item";
 import { Types } from "mongoose";
-import { ItemModel } from "../schema/item.schema";
 import { paginateNestedArrayPipeline, parsePaginationQuery } from "./utils";
+import { Item } from "../types/Location";
 
 /**
  * Create a new Location for the requesting user. Users with free accounts can
