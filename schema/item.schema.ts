@@ -12,6 +12,10 @@ interface ItemModel extends Model<Item> {}
 
 const ItemSchema = new Schema<Item, ItemModel, {}>(
   {
+    _id: {
+      type: Schema.Types.ObjectId,
+      required: true,
+    },
     name: {
       type: String,
       required: [true, "Item name is required."],

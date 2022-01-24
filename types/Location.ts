@@ -24,6 +24,10 @@ export interface Location extends TimestampType {
    */
   members: Types.Array<BaseUser>;
   /**
+   * The items in this Location
+   */
+  items: Types.Array<Item>;
+  /**
    * When to notify different users about items in this location expiring
    */
   notificationDays: Types.Array<{
@@ -37,9 +41,22 @@ export interface Location extends TimestampType {
     days: Types.Array<number>;
   }>;
   /**
-   * The items in this Location
+   * When each User last opened the Location (for home page sorting)
    */
-  items: Types.Array<Item>;
+  lastOpened: Types.Array<{
+    /**
+     * The user id
+     */
+    user: Types.ObjectId;
+    /**
+     * When the user last opened the Location
+     */
+    date: Date;
+  }>;
+  /**
+   * The user who last updated the Location
+   */
+  lastUpdatedBy: BaseUser;
   /**
    * Any notes about this Location
    */

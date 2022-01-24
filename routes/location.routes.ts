@@ -58,17 +58,17 @@ router.get("/:id/items", locations.getItems);
 /**
  * GET /api/v1/locations/{id}/items/{itemId}
  */
-router.get("/:id/items/:item", locations.getItem);
+router.get("/:id/items/:itemId", locations.getItem);
 
 /**
  * PUT /api/v1/locations/{id}/items/{itemId}
  */
-router.put("/:id/items/:item", locations.updateItem);
+router.put("/:id/items/:itemId", locations.updateItem);
 
 /**
  * DELETE /api/v1/locations/{id}/items/{itemId}
  */
-router.delete("/:id/items/:item", locations.removeItem);
+router.delete("/:id/items/:itemId", locations.removeItem);
 
 // Item searching //
 

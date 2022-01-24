@@ -32,7 +32,7 @@ export const login = catchAsync(async (req, res, next) => {
   if (!passwordMatch) {
     return next(AuthErrors.INCORRECT_PASSWORD);
   } else {
-    if (user.mfa_enabled) {
+    if (user.mfaEnabled) {
       if (!req.body.code) {
         const verifyCode = await user.getVerificationCode("2FA");
         sendSMS(user.phone, MFATemplate(verifyCode));

@@ -7,6 +7,7 @@ import { BaseUser } from "../types/User";
 import { Item } from "../types/Item";
 import { Types } from "mongoose";
 import { ItemModel } from "../schema/item.schema";
+import { paginateNestedArrayPipeline, parsePaginationQuery } from "./utils";
 
 /**
  * Create a new Location for the requesting user. Users with free accounts can
@@ -15,9 +16,11 @@ import { ItemModel } from "../schema/item.schema";
  */
 export const createLocation = catchAsync(async (req, res, next) => {
   const isPremium = UserModel.isPremium(req.user);
-  const { _id, ...data } = req.body;
+  const { name, iconName, notes } = req.body;
 
+  // Restrictions apply if the user is not premium
   if (!isPremium) {
+    // They cannot create a second Location
     if (req.user.defaultLocation) {
       return next(
         AuthErrors.PREMIUM_FEATURE(
@@ -26,9 +29,10 @@ export const createLocation = catchAsync(async (req, res, next) => {
       );
     }
 
+    // They can only create "fridge" or "pantry" Locations
     if (
-      data.iconName.toLowerCase() != "fridge" &&
-      data.iconName.toLowerCase() != "pantry"
+      iconName.toLowerCase() != "fridge" &&
+      iconName.toLowerCase() != "pantry"
     ) {
       return next(
         AuthErrors.PREMIUM_FEATURE(
@@ -40,13 +44,13 @@ export const createLocation = catchAsync(async (req, res, next) => {
 
   // Create the new Location
   const newLocation = await LocationModel.create({
-    name: data.name,
-    iconName: data.iconName,
+    name: name,
+    iconName: iconName,
     owner: {
       _id: req.user._id,
       name: req.user.name,
       photoUrl: req.user.photoUrl,
-      subscription_expires: req.user.subscription_expires,
+      subscriptionExpires: req.user.subscriptionExpires,
     },
     notificationDays: [
       {
@@ -54,13 +58,26 @@ export const createLocation = catchAsync(async (req, res, next) => {
         days: [],
       },
     ],
+    lastOpened: [
+      {
+        user: req.user._id,
+        date: new Date(),
+      },
+    ],
+    lastUpdatedBy: {
+      _id: req.user._id,
+      name: req.user.name,
+      photoUrl: req.user.photoUrl,
+    },
+    notes: notes,
   });
 
   // If this is the user's first Location, specify this
   if (!req.user.defaultLocation) {
     await UserModel.updateOne(
       { _id: req.user._id },
-      { defaultLocation: newLocation._id }
+      { defaultLocation: newLocation._id },
+      { runValidators: true }
     );
   }
 
@@ -73,45 +90,75 @@ export const createLocation = catchAsync(async (req, res, next) => {
  * Get a list of all the Locations the current user has access to. Users with a
  * free account can view Locations that they own and the one shared Location
  * they are allowed to join. Premium users can view Locations that they own or
- * are a member of. Locations can be searched by name
+ * are a member of.
+ *
+ * - Limit/offset supported
+ * - Search by Location name
+ * - Sort by name, createdAt, updatedAt, lastOpened
  */
 export const getLocations = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const query = req.query;
     const conditions: any = {};
+
+    const { order, limit, offset } = parsePaginationQuery(query);
     query.q && (conditions.name = new RegExp(String(query.q), "i"));
+    const sortField = query.sort ? String(query.sort) : "lastOpened";
 
-    const { sort, limit, offset } = parsePaginationQuery(query);
+    const aggregation = await LocationModel.aggregate([
+      {
+        $match: { $and: [locationModel.getFilter(), conditions] },
+      },
+      {
+        $addFields: {
+          lastOpenedByUser: {
+            $filter: {
+              input: "$lastOpened",
+              as: "lo",
+              cond: { $eq: ["$$lo.user", new Types.ObjectId(req.user._id)] },
+            },
+          },
+        },
+      },
+      {
+        $sort: {
+          [sortField == "lastOpened" ? "lastOpenedByUser.date" : sortField]:
+            order,
+        },
+      },
+      { $limit: limit },
+      { $skip: offset },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          iconName: 1,
+          owner: 1,
+          members: 1,
+          items: { $sum: "$items" },
+          notificationDays: {
+            $filter: {
+              input: "$notificationDays",
+              as: "nd",
+              cond: { eq: ["$$nd.user", new Types.ObjectId(req.user._id)] },
+            },
+          },
+          lastOpened: "$lastOpenedByUser",
+          notes: 1,
+          lastUpdatedBy: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
 
-    const locationQuery = locationModel
-      .find(conditions)
-      .sort(sort)
-      .limit(limit)
-      .skip(offset);
-
-    const projection = {
-      _id: 1,
-      name: 1,
-      iconName: 1,
-      owner: 1,
-      members: 1,
-      "items._id": 1,
-      notificationDays: { $elemMatch: { user: req.user._id } },
-      notes: 1,
-      createdAt: 1,
-      updatedAt: 1,
-    };
-    locationQuery.projection(projection);
-
-    const locations: any = await locationQuery;
-    const locationsWithCount = locations.map((location) => {
-      return {
-        ...location.toJSON(),
-        items: location.items.length,
-      };
+    const locations = aggregation.map((location) => {
+      const json = LocationModel.hydrate(location).toJSON();
+      json.items = location.items;
+      return json;
     });
 
-    res.status(200).send(locationsWithCount);
+    res.status(200).send(locations);
   },
   [LocationModel, "view"]
 );
@@ -124,26 +171,47 @@ export const getLocations = authorizeAndCatchAsync(
  */
 export const getLocation = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
-    const locationQuery = locationModel.findOne({ _id: req.params.id });
+    const aggregation = await LocationModel.aggregate([
+      {
+        $match: {
+          $and: [
+            locationModel.getFilter(),
+            { _id: new Types.ObjectId(req.params.id) },
+          ],
+        },
+      },
+      {
+        $project: {
+          _id: 1,
+          name: 1,
+          iconName: 1,
+          owner: 1,
+          members: 1,
+          items: { $sum: "$items" },
+          totalValue: { $sum: "$items.price" },
+          notificationDays: {
+            $filter: {
+              input: "$notificationDays",
+              as: "nd",
+              cond: { eq: ["$$nd.user", new Types.ObjectId(req.user._id)] },
+            },
+          },
+          lastOpened: {
+            $filter: {
+              input: "$lastOpened",
+              as: "lo",
+              cond: { $eq: ["$$lo.user", new Types.ObjectId(req.user._id)] },
+            },
+          },
+          notes: 1,
+          lastUpdatedBy: 1,
+          createdAt: 1,
+          updatedAt: 1,
+        },
+      },
+    ]);
 
-    const projection = {
-      _id: 1,
-      name: 1,
-      iconName: 1,
-      owner: 1,
-      members: 1,
-      "items._id": 1,
-      notificationDays: { $elemMatch: { user: req.user._id } },
-      notes: 1,
-      createdAt: 1,
-      updatedAt: 1,
-    };
-
-    locationQuery.projection(projection);
-
-    const location = await locationQuery;
-
-    if (!location) {
+    if (aggregation.length < 1) {
       return next(
         DatabaseErrors.NOT_FOUND(
           "A location with this id does not exist or you do not have permission to view it."
@@ -151,44 +219,71 @@ export const getLocation = authorizeAndCatchAsync(
       );
     }
 
-    const locationJSON: any = location.toJSON();
-    locationJSON.items = locationJSON.items.length;
+    const { totalValue, ...location } = aggregation[0];
+    const json: any = LocationModel.hydrate(location).toJSON();
+    json.totalValue = totalValue;
 
-    res.status(200).send(locationJSON);
+    res.status(200).send(json);
   },
   [LocationModel, "view"]
 );
 
 /**
  * Update the Location with the given ID. Updatable fields include name,
- * iconName, and notificationDays. Users with free accounts can update their
- * default personal Location and their default shared Location, as long as the
- * owner of the shared Location has an active subscription. Premium users can
- * update Locations that they own or that they are a member of, provided that
- * the owner of the Location has an active subscription
+ * iconName, lastUpdated, notes, and notificationDays. Users with free accounts
+ * can update their default personal Location and their default shared Location,
+ * as long as the owner of the shared Location has an active subscription.
+ * Premium users can update Locations that they own or that they are a member
+ * of, provided that the owner of the Location has an active subscription
  */
 export const updateLocation = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
-    const { notificationDays, name, iconName } = req.body;
+    const { notificationDays, name, iconName, lastOpened, notes } = req.body;
 
-    const newData = {
-      name: name,
-      iconName: iconName,
-      "notificationDays.$.days": notificationDays,
-    };
-
-    const updateResult = await locationModel.updateOne(
-      { _id: req.params.id, "notificationDays.user": req.user._id },
-      newData,
-      { runValidators: true }
+    const error = DatabaseErrors.NOT_FOUND(
+      "A location with this id does not exist or you do not have permission to modify it."
     );
 
-    if (updateResult.matchedCount < 1) {
-      return next(
-        DatabaseErrors.NOT_FOUND(
-          "A location with this id does not exist or you do not have permission to modify it."
-        )
+    const newData: any = {
+      name: name,
+      iconName: iconName,
+      notes: notes,
+      lastUpdatedBy: {
+        _id: req.user._id,
+        name: req.user.name,
+        photoUrl: req.user.photoUrl,
+      },
+    };
+
+    const filter: any = { _id: req.params.id };
+
+    if (notificationDays != null && lastOpened) {
+      const updateResult = await locationModel.updateOne(
+        { _id: req.params.id, "notificationDays.user": req.user._id },
+        { "notificationDays.$.days": notificationDays },
+        { runValidators: true }
       );
+
+      if (updateResult.matchedCount < 1) {
+        return next(error);
+      }
+
+      newData.lastOpened.$.days = lastOpened;
+      filter.lastOpened.user = req.user._id;
+    } else if (notificationDays != null) {
+      newData.notificationDays.$.days = notificationDays;
+      filter.notificationDays.user = req.user._id;
+    } else if (lastOpened) {
+      newData.lastOpened.$.days = lastOpened;
+      filter.lastOpened.user = req.user._id;
+    }
+
+    const updateResult = await locationModel.updateOne(filter, newData, {
+      runValidators: true,
+    });
+
+    if (updateResult.matchedCount < 1) {
+      return next(error);
     }
 
     res
@@ -226,9 +321,12 @@ export const deleteLocation = authorizeAndCatchAsync(
 );
 
 /**
- * Add the requesting user as a member of the Location with the given ID.
- * Free users can join up to one Location owned by a premium user, and premium
- * users can join unlimited Locations owned by premium users
+ * Add the requesting user as a member of the Location with the given ID. Free
+ * users can join up to one Location owned by a premium user, and premium users
+ * can join unlimited Locations owned by premium users. If a free user does not
+ * have a default shared location but is a member of another location from when
+ * they had a previous subscription, rejoining that location will set that
+ * location as their default shared location
  */
 export const joinLocation = catchAsync(async (req, res, next) => {
   const userId = req.user._id;
@@ -244,7 +342,7 @@ export const joinLocation = catchAsync(async (req, res, next) => {
 
   const location = await LocationModel.findOne(
     { _id: req.params.id, "owner._id": { $ne: userId } },
-    "_id owner"
+    "_id owner members._id"
   ).lean();
 
   if (!location) {
@@ -265,28 +363,60 @@ export const joinLocation = catchAsync(async (req, res, next) => {
     );
   }
 
-  const newMember: BaseUser = {
-    _id: req.user._id,
-    name: req.user.name,
-    photoUrl: req.user.photoUrl,
-  };
+  if (
+    location.members.some(
+      (member) => member._id.toString() == userId.toString()
+    )
+  ) {
+    if (!isPremium && !req.user.defaultSharedLocation) {
+      await UserModel.updateOne(
+        { _id: userId },
+        { defaultSharedLocation: req.params.id },
+        { runValidators: true }
+      );
 
-  await LocationModel.updateOne(
-    { _id: req.params.id, "owner._id": { $ne: userId } },
-    {
-      $addToSet: {
-        members: newMember,
-        notificationDays: { user: userId, days: [] },
-      },
+      res.status(200).send({
+        message: `Location ${req.params.id} set as user's default shared Location.`,
+      });
+    } else {
+      return next(
+        DatabaseErrors.INVALID_FIELD(
+          "You are already a member of this Location."
+        )
+      );
     }
-  );
+  } else {
+    const newMember: BaseUser = {
+      _id: req.user._id,
+      name: req.user.name,
+      photoUrl: req.user.photoUrl,
+    };
 
-  // Update the user's default shared location, if necessary
-  if (!req.user.defaultSharedLocation) {
-    await UserModel.updateOne(
-      { _id: userId },
-      { defaultSharedLocation: req.params.id }
+    // Add the member
+    await LocationModel.updateOne(
+      { _id: req.params.id, "owner._id": { $ne: userId } },
+      {
+        $addToSet: {
+          members: newMember,
+          notificationDays: { user: userId, days: [] },
+          lastOpened: { user: userId, date: new Date() },
+        },
+      },
+      { runValidators: true }
     );
+
+    // Update the user's default shared location, if necessary
+    if (!req.user.defaultSharedLocation) {
+      await UserModel.updateOne(
+        { _id: userId },
+        { defaultSharedLocation: req.params.id },
+        { runValidators: true }
+      );
+    }
+
+    res.status(200).send({
+      message: `User added to Location ${req.params.id} successfully.`,
+    });
   }
 });
 
@@ -295,15 +425,18 @@ export const joinLocation = catchAsync(async (req, res, next) => {
  * Free users can remove members from their default shared Location, given that
  * the owner has an active subscription. Premium users can remove members from
  * Locations which they own or are a member of, provided that the owner has an
- * active subscription.
+ * active subscription. Free users can remove themselves from their default
+ * shared Location, and premium users can remove themselves from any Location
+ * they are a member of.
  */
 export const removeMember = authorizeAndCatchAsync(
   async (req, res, next, locationUpdate, locationView) => {
-    // Determine authorization based on requesting user
     let locationModel = locationView;
     let member = req.user._id.toString();
 
-    if (req.user._id.toString() != req.params.id) {
+    if (
+      req.path.substring(req.path.lastIndexOf("/") + 1).toLowerCase() != "leave"
+    ) {
       locationModel = locationUpdate;
       member = req.params.memberId;
     }
@@ -314,9 +447,11 @@ export const removeMember = authorizeAndCatchAsync(
         $pull: {
           members: { _id: member },
           notificationDays: { user: member },
+          lastOpened: { user: member },
           items: { "owner._id": member },
         },
-      }
+      },
+      { runValidators: true }
     );
 
     if (updatedLocation.matchedCount < 1) {
@@ -365,7 +500,17 @@ export const addItem = authorizeAndCatchAsync(
 
     const update = await locationModel.updateOne(
       { _id: location },
-      { $addToSet: { items: item } }
+      {
+        $push: { items: { $each: [item], $sort: { name: 1 } } },
+        $set: {
+          lastUpdatedBy: {
+            _id: req.user._id,
+            name: req.user.name,
+            photoUrl: req.user.photoUrl,
+          },
+        },
+      },
+      { runValidators: true }
     );
 
     if (update.matchedCount < 1) {
@@ -390,8 +535,6 @@ export const addItem = authorizeAndCatchAsync(
 export const getItems = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const query = req.query;
-    const { offset, limit, sort } = parsePaginationQuery(query, "items");
-
     const pipeline: any[] = [
       {
         $match: {
@@ -401,30 +544,12 @@ export const getItems = authorizeAndCatchAsync(
           ],
         },
       },
-      { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } },
-      { $sort: sort },
-      {
-        $group: {
-          _id: "$_id",
-          items: {
-            $push: "$items",
-          },
-        },
-      },
-      {
-        $project: {
-          items: {
-            $slice: ["$items", offset, limit],
-          },
-        },
-      },
+      ...paginateNestedArrayPipeline(query, {
+        arrayField: "items",
+        defaultSortField: "name",
+        searchField: "name",
+      }),
     ];
-
-    if (query.q) {
-      pipeline.splice(2, 0, {
-        $match: { "items.name": new RegExp(String(query.q), "i") },
-      });
-    }
 
     const aggregation: any = await LocationModel.aggregate(pipeline);
 
@@ -444,19 +569,22 @@ export const getItems = authorizeAndCatchAsync(
 );
 
 /**
- * Get the Item with the given ID from the Location with the given ID.
+ * Get the Item with the given ID from the Location with the given ID. Users
+ * with a free account can view Items in Locations that they own and the one
+ * shared Location they are allowed to join. Premium users can view Items in
+ * Locations that they own or are a member of. Items can be searched by name
  */
 export const getItem = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const location = await locationModel.findOne(
-      { _id: req.params.id, "items._id": req.params.item },
+      { _id: req.params.id, "items._id": req.params.itemId },
       { "items.$": 1, name: 1, _id: 1 }
     );
 
     if (location.items.length < 1) {
       return next(
         DatabaseErrors.NOT_FOUND(
-          "An item with this id was not found or you do not have permission to view it."
+          "An Item with this id was not found or you do not have permission to view it."
         )
       );
     }
@@ -507,11 +635,17 @@ export const updateItem = authorizeAndCatchAsync(
       "items.$.purchaseLocation": purchaseLocation,
       "items.$.notes": notes,
       "items.$.price": price,
+      lastUpdatedBy: {
+        _id: req.user._id,
+        name: req.user.name,
+        photoUrl: req.user.photoUrl,
+      },
     };
 
     const update = await locationModel.updateOne(
-      { _id: req.params.id, "items._id": req.params.item },
-      newItem
+      { _id: req.params.id, "items._id": req.params.itemId },
+      newItem,
+      { runValidators: true }
     );
 
     if (update.matchedCount < 1) {
@@ -523,7 +657,7 @@ export const updateItem = authorizeAndCatchAsync(
     }
 
     res.status(200).send({
-      message: `Item ${req.params.item} in ${req.params.id} updated successfully`,
+      message: `Item ${req.params.itemId} in ${req.params.id} updated successfully`,
     });
   },
   [LocationModel, "update"]
@@ -540,8 +674,17 @@ export const updateItem = authorizeAndCatchAsync(
 export const removeItem = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const update = await locationModel.updateOne(
-      { _id: req.params.id },
-      { $pull: { items: { _id: req.params.item } } }
+      { _id: req.params.id, "items._id": req.params.itemId },
+      {
+        $pull: { items: { _id: req.params.itemId } },
+        $set: {
+          lastUpdatedBy: {
+            _id: req.user._id,
+            name: req.user.name,
+            photoUrl: req.user.photoUrl,
+          },
+        },
+      }
     );
 
     if (update.matchedCount < 1) {
@@ -553,7 +696,7 @@ export const removeItem = authorizeAndCatchAsync(
     }
 
     res.status(200).send({
-      message: `Item ${req.params.item} in ${req.params.id} updated successfully`,
+      message: `Item ${req.params.itemId} in ${req.params.id} updated successfully`,
     });
   },
   [LocationModel, "update"]
@@ -568,7 +711,6 @@ export const removeItem = authorizeAndCatchAsync(
 export const searchItems = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const query = req.query;
-    const { limit, offset, sort } = parsePaginationQuery(query, "items");
 
     const pipeline: any[] = [
       {
@@ -580,19 +722,11 @@ export const searchItems = authorizeAndCatchAsync(
         },
       },
       { $addFields: { items: { location: { name: "$name", id: "$_id" } } } },
-      { $unwind: { path: "$items", preserveNullAndEmptyArrays: true } },
-      {
-        $match: { "items.name": new RegExp(String(query.q), "i") },
-      },
-      { $sort: sort },
-      { $group: { _id: null, items: { $push: "$items" } } },
-      {
-        $project: {
-          items: {
-            $slice: ["$items", offset, limit],
-          },
-        },
-      },
+      ...paginateNestedArrayPipeline(query, {
+        arrayField: "items",
+        defaultSortField: "name",
+        searchField: "name",
+      }),
     ];
 
     const aggregation: any = await LocationModel.aggregate(pipeline);
@@ -614,53 +748,3 @@ export const searchItems = authorizeAndCatchAsync(
   },
   [LocationModel, "view"]
 );
-
-type PaginationQuery = {
-  order?: string;
-  sort?: string;
-  offset?: string;
-  limit?: string;
-};
-
-/**
- * Determines order, sort, limit, and offset for a query
- * @param query The query to parse
- * @returns Order, sort, limit, and offset.
- */
-const parsePaginationQuery = (
-  query: PaginationQuery,
-  sortFieldPrefix?: string,
-  defaultSortField = "name"
-) => {
-  let order = 1;
-  if (query.order && query.order == "desc") {
-    order = -1;
-  }
-
-  let sort: any;
-  if (sortFieldPrefix) {
-    sort = { [`${sortFieldPrefix}.${defaultSortField}`]: order, _id: 1 };
-  } else {
-    sort = { [defaultSortField]: order, _id: 1 };
-  }
-
-  if (query.sort) {
-    if (sortFieldPrefix) {
-      sort = { [`${sortFieldPrefix}.${String(query.sort)}`]: order, _id: 1 };
-    } else {
-      sort = { [String(query.sort)]: order, _id: 1 };
-    }
-  }
-
-  let limit = 30;
-  if (query.limit && !isNaN(Number(query.limit))) {
-    limit = Math.min(Number(query.limit), limit);
-  }
-
-  let offset = 0;
-  if (query.offset && !isNaN(Number(query.offset))) {
-    offset = Math.max(Number(query.offset), 0);
-  }
-
-  return { sort, limit, offset };
-};

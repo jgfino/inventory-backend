@@ -1,8 +1,12 @@
-import { Types } from "mongoose";
+import { ObjectId, Types } from "mongoose";
 import TimestampType from "./TimestampType";
 import { BaseUser, BaseUserWithExpiry } from "./User";
 
 export interface ShoppingListItem {
+  /**
+   * The id of the item
+   */
+  _id: Types.ObjectId;
   /**
    * The name of the item
    */
@@ -10,7 +14,7 @@ export interface ShoppingListItem {
   /**
    * Any notes for the item
    */
-  notes: string;
+  notes?: string;
   /**
    * Whether a user has checked off this item
    */
@@ -20,6 +24,11 @@ export interface ShoppingListItem {
    * The user who added the item to the list
    */
   owner: BaseUser;
+
+  /**
+   * The position of the Item in the List
+   */
+  pos: number;
 }
 
 /**
@@ -42,7 +51,10 @@ interface ShoppingList extends TimestampType {
    * The items on the list
    */
   items: Types.Array<ShoppingListItem>;
-
+  /**
+   * The user who last updated the Shopping List
+   */
+  lastUpdatedBy: BaseUser;
   /**
    * Members of this list (for premium users)
    */

@@ -57,7 +57,7 @@ export const BaseUserWithExpirySchema = new Schema<
       type: String,
       default: null,
     },
-    subscription_expires: {
+    subscriptionExpires: {
       type: Date,
     },
   },
@@ -66,7 +66,9 @@ export const BaseUserWithExpirySchema = new Schema<
       transform: (doc, ret) => {
         delete ret._id;
         delete ret.__v;
-        delete ret.subscription_expires;
+
+        ret.isSubscribed = ret.subscriptionExpires > new Date();
+        delete ret.subscriptionExpires;
       },
       virtuals: true,
     },

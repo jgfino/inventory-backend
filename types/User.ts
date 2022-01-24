@@ -23,7 +23,7 @@ export interface BaseUserWithExpiry extends BaseUser {
   /**
    * When the user's subscription expires, if applicable
    */
-  subscription_expires: Date;
+  subscriptionExpires: Date;
 }
 
 /**
@@ -38,7 +38,7 @@ export interface User extends Omit<BaseUserWithExpiry, "_id">, TimestampType {
   /**
    * Whether the user has verified their email.
    */
-  email_verified: boolean;
+  emailVerified: boolean;
 
   /**
    * The user's phone number.
@@ -48,7 +48,7 @@ export interface User extends Omit<BaseUserWithExpiry, "_id">, TimestampType {
   /**
    * Whether the user has verified their phone number.
    */
-  phone_verified: boolean;
+  phoneVerified: boolean;
 
   /**
    * The user's oldest owned Location.
@@ -69,7 +69,7 @@ export interface User extends Omit<BaseUserWithExpiry, "_id">, TimestampType {
    * The 6 digit code used to verify a user's email/phone number. Also used
    * for 2FA.
    */
-  account_verification_code?: {
+  accountVerificationCode?: {
     code: string;
     mode: "email" | "phone" | "2FA";
   };
@@ -77,12 +77,12 @@ export interface User extends Omit<BaseUserWithExpiry, "_id">, TimestampType {
   /**
    * When the user's account verification code expires, if applicable
    */
-  account_verification_expiry?: Date;
+  accountVerificationExpiry?: Date;
 
   /**
    * Whether the user has 2FA enabled
    */
-  mfa_enabled: boolean;
+  mfaEnabled: boolean;
 
   /**
    * The user's password.
@@ -93,15 +93,15 @@ export interface User extends Omit<BaseUserWithExpiry, "_id">, TimestampType {
    * The user's refresh token secret. A user can only have one at a time to prevent
    * logins on multiple devices. This may be changed in the future
    */
-  refresh_token_secret: string;
+  refreshTokenSecret: string;
 
   /**
    * The user's 6 digit password reset code, if applicable.
    */
-  password_reset_code?: string;
+  passwordResetCode?: string;
 
   /**
    * When the user's password reset code expires, if applicable.
    */
-  password_reset_expiry?: Date;
+  passwordResetExpiry?: Date;
 }

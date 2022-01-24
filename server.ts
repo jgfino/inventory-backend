@@ -140,12 +140,12 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
 cron.schedule("0 0 * * *", async () => {
   try {
     const expiredPassword = await UserModel.updateMany(
-      { password_reset_expiry: { $lt: new Date() } },
-      { $unset: { password_reset_expiry: "" } }
+      { passwordResetExpiry: { $lt: new Date() } },
+      { $unset: { passwordResetExpiry: "" } }
     );
     const expiredVerify = await UserModel.updateMany(
-      { account_verification_expiry: { $lt: new Date() } },
-      { $unset: { account_verification_expiry: "" } }
+      { accountVerificationExpiry: { $lt: new Date() } },
+      { $unset: { accountVerificationExpiry: "" } }
     );
 
     console.log(

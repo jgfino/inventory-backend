@@ -20,7 +20,7 @@ passport.use(
         _id: 1,
         name: 1,
         photoUrl: 1,
-        subscription_expires: 1,
+        subscriptionExpires: 1,
         defaultLocation: 1,
         defaultSharedLocation: 1,
         defaultShoppingList: 1,

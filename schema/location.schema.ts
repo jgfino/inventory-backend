@@ -1,12 +1,10 @@
-import { Document, FilterQuery, model, Schema } from "mongoose";
+import { FilterQuery, model, Schema } from "mongoose";
 import { Location } from "../types/Location";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
-import AuthErrors from "../error/errors/auth.errors";
 import { BaseUserSchema, BaseUserWithExpirySchema } from "./baseUser.schema";
 import ItemSchema from "./item.schema";
 import UserModel from "./user.schema";
-import { Item } from "../types/Item";
 
 //#region Types
 
@@ -51,6 +49,8 @@ const LocationSchema = new Schema<Location, LocationModel, {}, {}>(
           {
             type: Number,
             required: true,
+            min: 0,
+            max: 30,
             default: [],
           },
         ],
@@ -58,6 +58,24 @@ const LocationSchema = new Schema<Location, LocationModel, {}, {}>(
       },
     ],
     items: [ItemSchema],
+    lastOpened: [
+      {
+        user: {
+          type: Schema.Types.ObjectId,
+          required: true,
+        },
+        date: {
+          type: Date,
+          required: true,
+          default: new Date(),
+        },
+        _id: false,
+      },
+    ],
+    lastUpdatedBy: {
+      type: BaseUserSchema,
+      required: true,
+    },
     notes: {
       type: String,
       maxlength: 300,
@@ -74,13 +92,8 @@ const LocationSchema = new Schema<Location, LocationModel, {}, {}>(
           ret.notificationDays = ret.notificationDays[0]?.days;
         }
 
-        const items: Document<any, any, Item>[] = ret.items;
-        if (!items || items.length < 1) {
-          return;
-        }
-
-        if (Object.keys(items[0]).length == 1) {
-          ret.items = items.map((item) => item.id);
+        if (ret.lastOpened) {
+          ret.lastOpened = ret.lastOpened[0]?.date;
         }
       },
       virtuals: true,
@@ -136,7 +149,7 @@ LocationSchema.statics.authorize = function (
   const isMember = { "members._id": userId };
 
   const ownerIsSubscribed = {
-    "owner.subscription_expires": { $gt: new Date() },
+    "owner.subscriptionExpires": { $gt: new Date() },
   };
 
   let query: FilterQuery<Location>;
@@ -168,6 +181,7 @@ LocationSchema.statics.authorize = function (
         break;
       case "view":
         query = { $or: [owned, isMember] };
+        break;
     }
   }
 

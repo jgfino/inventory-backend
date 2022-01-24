@@ -4,52 +4,56 @@ import express from "express";
 const router = express.Router();
 
 /**
- * Create a shopping list
+ * POST /api/v1/lists
  */
 router.post("/", shoppingLists.createList);
 
 /**
- * Get all shopping lists. Sorted by creation date
+ * GET /api/v1/lists
  */
 router.get("/", shoppingLists.getLists);
 
 /**
- * Get a shopping list with the given id.
+ * GET /api/v1/lists/{id}
  */
 router.get("/:id", shoppingLists.getList);
 
 /**
- * Update the shopping list with the given id. Updatable fields include name,
- * notes
+ * PUT /api/v1/lists/{id}
  */
-router.put("/:id", shoppingLists.updateLocation);
+router.put("/:id", shoppingLists.updateList);
 
 /**
- * Delete the shopping list with the given id
+ * DELETE /api/v1/lists/{id}
  */
 router.delete("/:id", shoppingLists.deleteList);
 
 /**
- * Add an item to the given shopping list
+ * POST /api/v1/lists/{id}/join
+ */
+router.post("/:id/members", shoppingLists.joinList);
+
+/**
+ * POST /api/v1/lists/{id}/leave
+ */
+router.post("/:id/members", shoppingLists.removeMember);
+
+/**
+ * DELETE /api/v1/lists/{id}/members/{memberId}
+ */
+router.delete("/:id/members/:memberId", shoppingLists.removeMember);
+
+/**
+ * POST /api/v1/lists/{id}/items
  */
 router.post("/:id/items", shoppingLists.addItem);
 
 /**
- * Update the given item in the given shopping list
+ * PUT /api/v1/lists/{id}/items/{itemId}
  */
 router.put("/:id/items/:itemId", shoppingLists.updateItem);
 
 /**
- * Remove the given item from the given shopping list
+ * DELETE /api/v1/lists/{id}/items/{itemId}
  */
 router.delete("/:id/items/:itemId", shoppingLists.deleteItem);
-
-/**
- * Add the requesting user to the given shopping list
- */
-router.post("/:id/members", shoppingLists.addMember);
-
-/**
- * Remove a member from a shopping list
- */
-router.delete("/:id/members/:memberId", shoppingLists.removeMember);

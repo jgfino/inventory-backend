@@ -132,7 +132,7 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       set: (v?: string) =>
         v ? validator.normalizeEmail(v, { all_lowercase: true }) : v,
     },
-    email_verified: {
+    emailVerified: {
       type: Boolean,
       default: false,
     },
@@ -146,11 +146,11 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
         message: "Invalid phone number format.",
       },
     },
-    phone_verified: {
+    phoneVerified: {
       type: Boolean,
       default: false,
     },
-    subscription_expires: {
+    subscriptionExpires: {
       type: Date,
     },
     defaultLocation: {
@@ -165,16 +165,16 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
       type: Schema.Types.ObjectId,
       ref: "ShoppingList",
     },
-    account_verification_code: {
+    accountVerificationCode: {
       type: {
         code: String,
         mode: String,
       },
     },
-    account_verification_expiry: {
+    accountVerificationExpiry: {
       type: Date,
     },
-    mfa_enabled: {
+    mfaEnabled: {
       type: Boolean,
       default: false,
     },
@@ -187,13 +187,13 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
           "Password must be 8 characters, contain at least 1 uppercase letter, 1 symbol, and 1 number.",
       },
     },
-    refresh_token_secret: {
+    refreshTokenSecret: {
       type: String,
     },
-    password_reset_code: {
+    passwordResetCode: {
       type: String,
     },
-    password_reset_expiry: {
+    passwordResetExpiry: {
       type: Date,
     },
   },
@@ -204,12 +204,12 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
-        delete ret.refresh_token_secret;
-        delete ret.account_verification_code;
-        delete ret.account_verification_expiry;
+        delete ret.refreshTokenSecret;
+        delete ret.accountVerificationCode;
+        delete ret.accountVerificationExpiry;
         delete ret.password;
-        delete ret.password_reset_code;
-        delete ret.password_reset_expiry;
+        delete ret.passwordResetCode;
+        delete ret.passwordResetExpiry;
       },
       virtuals: true,
     },
@@ -229,11 +229,11 @@ UserSchema.pre("save", async function (next) {
   }
 
   if (this.isModified("email")) {
-    this.email_verified = false;
+    this.emailVerified = false;
   }
 
   if (this.isModified("phone")) {
-    this.phone_verified = false;
+    this.phoneVerified = false;
   }
 
   if (!this.isNew) {
@@ -291,15 +291,15 @@ UserSchema.pre("save", async function (next) {
       );
     }
 
-    if (this.isModified("subscription_expires")) {
+    if (this.isModified("subscriptionExpires")) {
       await LocationModel.updateMany(
         { "owner.id": this.id },
-        { "owner.subscription_expires": this.subscription_expires }
+        { "owner.subscriptionExpires": this.subscriptionExpires }
       );
 
       await ShoppingListModel.updateMany(
         { "owner.id": this.id },
-        { "owner.subscription_expires": this.subscription_expires }
+        { "owner.subscriptionExpires": this.subscriptionExpires }
       );
     }
   }
@@ -439,7 +439,7 @@ UserSchema.statics.refreshTokens = async function (
     }
   }
 
-  if (bcrypt.compareSync(decodedRefresh.jti, userDoc.refresh_token_secret)) {
+  if (bcrypt.compareSync(decodedRefresh.jti, userDoc.refreshTokenSecret)) {
     return await userDoc.generateTokens();
   } else {
     return Promise.reject(
@@ -470,7 +470,7 @@ UserSchema.statics.findByEmailOrPhone = async function (emailOrPhone: string) {
 };
 
 UserSchema.statics.isPremium = function (user: BaseUserWithExpiry) {
-  return user.subscription_expires > new Date();
+  return user.subscriptionExpires > new Date();
 };
 
 //#endregion
@@ -500,7 +500,7 @@ UserSchema.methods.generateTokens = async function () {
     expiresIn: "7 days", // TODO: 15 mins
   });
 
-  this.refresh_token_secret = bcrypt.hashSync(refreshSecret, 10);
+  this.refreshTokenSecret = bcrypt.hashSync(refreshSecret, 10);
   await this.save();
 
   return {
@@ -512,17 +512,17 @@ UserSchema.methods.generateTokens = async function () {
 
 // Enable 2fa for this user, if possible.
 UserSchema.methods.enable2fa = async function () {
-  if (!this.phone || !this.phone_verified) {
+  if (!this.phone || !this.phoneVerified) {
     return Promise.reject(AuthErrors.MFA_NO_PHONE);
   } else {
-    this.mfa_enabled = true;
+    this.mfaEnabled = true;
     await this.save();
   }
 };
 
 // Disable 2fa for this user.
 UserSchema.methods.disable2fa = async function () {
-  this.mfa_enabled = false;
+  this.mfaEnabled = false;
   await this.save();
 };
 
@@ -533,13 +533,13 @@ UserSchema.methods.getVerificationCode = async function (
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const codeHash = bcrypt.hashSync(code, 10);
 
-  this.account_verification_code = {
+  this.accountVerificationCode = {
     mode: mode,
     code: codeHash,
   };
 
   // 5 minutes
-  this.account_verification_expiry = new Date(new Date().getTime() + 5 * 60000);
+  this.accountVerificationExpiry = new Date(new Date().getTime() + 5 * 60000);
   await this.save();
 
   return code;
@@ -551,29 +551,29 @@ UserSchema.methods.verifyCode = async function (
   mode: "email" | "phone" | "2FA"
 ) {
   if (
-    !this.account_verification_code ||
-    !this.account_verification_expiry ||
-    !bcrypt.compareSync(code, this.account_verification_code.code) ||
-    this.account_verification_code.mode != mode
+    !this.accountVerificationCode ||
+    !this.accountVerificationExpiry ||
+    !bcrypt.compareSync(code, this.accountVerificationCode.code) ||
+    this.accountVerificationCode.mode != mode
   ) {
     return Promise.reject(AuthErrors.INVALID_CODE);
   }
 
-  if (this.account_verification_expiry.getTime() < new Date().getTime()) {
+  if (this.accountVerificationExpiry.getTime() < new Date().getTime()) {
     return Promise.reject(AuthErrors.EXPIRED_CODE);
   }
 
   switch (mode) {
     case "email":
-      this.email_verified = true;
+      this.emailVerified = true;
       break;
     case "phone":
-      this.phone_verified = true;
+      this.phoneVerified = true;
       break;
   }
 
-  this.account_verification_code = undefined;
-  this.account_verification_expiry = undefined;
+  this.accountVerificationCode = undefined;
+  this.accountVerificationExpiry = undefined;
   await this.save();
 };
 
@@ -582,8 +582,8 @@ UserSchema.methods.getPasswordResetCode = async function () {
   const code = Math.floor(100000 + Math.random() * 900000).toString();
   const codeHash = bcrypt.hashSync(code, 10);
 
-  this.password_reset_code = codeHash;
-  this.password_reset_expiry = new Date(new Date().getTime() + 5 * 60000); // 5 minutes
+  this.passwordResetCode = codeHash;
+  this.passwordResetExpiry = new Date(new Date().getTime() + 5 * 60000); // 5 minutes
   await this.save();
 
   return code;
@@ -595,20 +595,20 @@ UserSchema.methods.resetPassword = async function (
   newPassword: string
 ) {
   if (
-    !this.password_reset_code ||
-    !this.password_reset_expiry ||
-    !bcrypt.compareSync(code, this.password_reset_code)
+    !this.passwordResetCode ||
+    !this.passwordResetExpiry ||
+    !bcrypt.compareSync(code, this.passwordResetCode)
   ) {
     return Promise.reject(AuthErrors.INVALID_CODE);
   }
 
-  if (this.password_reset_expiry.getTime() < new Date().getTime()) {
+  if (this.passwordResetExpiry.getTime() < new Date().getTime()) {
     return Promise.reject(AuthErrors.EXPIRED_CODE);
   }
 
   this.password = newPassword;
-  this.password_reset_expiry = undefined;
-  this.password_reset_code = undefined;
+  this.passwordResetExpiry = undefined;
+  this.passwordResetCode = undefined;
   await this.save();
 
   return await this.generateTokens();

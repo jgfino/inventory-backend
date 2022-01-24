@@ -6,6 +6,10 @@ import { BaseUser } from "./User";
  */
 export interface Item {
   /**
+   * The id of the item
+   */
+  _id: Types.ObjectId;
+  /**
    * The name of the item
    */
   name: string;

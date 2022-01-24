@@ -1,10 +1,10 @@
-import { FilterQuery, Model, model, Schema } from "mongoose";
+import { FilterQuery, Model, model, Schema, Types } from "mongoose";
 import QueryChain from "../types/QueryChain";
 import AuthorizableModel, { AuthModes } from "../types/AuthorizableModel";
-import AuthErrors from "../error/errors/auth.errors";
 import { BaseUserSchema, BaseUserWithExpirySchema } from "./baseUser.schema";
 import ShoppingList, { ShoppingListItem } from "../types/ShoppingList";
 import UserModel from "./user.schema";
+import { isInteger } from "lodash";
 
 //#region Types
 
@@ -22,6 +22,10 @@ const ShoppingListItemSchema = new Schema<
   ShoppingListItemModel,
   {}
 >({
+  _id: {
+    type: Schema.Types.ObjectId,
+    required: true,
+  },
   name: {
     type: String,
     required: true,
@@ -29,12 +33,19 @@ const ShoppingListItemSchema = new Schema<
   },
   notes: {
     type: String,
-    maxlength: 500,
+    maxlength: 300,
   },
   checked: {
     type: Boolean,
     required: true,
     default: false,
+  },
+  owner: BaseUserSchema,
+  pos: {
+    type: Number,
+    required: true,
+    min: 0,
+    validate: isInteger,
   },
 });
 
@@ -44,9 +55,11 @@ const ShoppingListSchema = new Schema<ShoppingList, ShoppingListModel, {}>(
       type: String,
       required: true,
       default: "My Shopping List",
+      maxlength: 300,
     },
     notes: {
       type: String,
+      maxlength: 300,
     },
     owner: {
       type: BaseUserWithExpirySchema,
@@ -54,6 +67,10 @@ const ShoppingListSchema = new Schema<ShoppingList, ShoppingListModel, {}>(
     },
     items: [ShoppingListItemSchema],
     members: [BaseUserSchema],
+    lastUpdatedBy: {
+      type: BaseUserSchema,
+      required: true,
+    },
   },
   {
     timestamps: true,
@@ -62,7 +79,7 @@ const ShoppingListSchema = new Schema<ShoppingList, ShoppingListModel, {}>(
         ret.id = ret._id;
         delete ret._id;
         delete ret.__v;
-        delete ret.owner?.subscription_expires;
+        delete ret.owner?.subscriptionExpires;
       },
       virtuals: true,
     },
@@ -103,93 +120,46 @@ ShoppingListSchema.statics.authorize = function (
   mode: AuthModes
 ) {
   const userId = auth._id;
-  const isSubscribed = auth.subscription_expires > new Date();
+  const isPremium = UserModel.isPremium(auth);
 
-  // The list is the user's default list
-  const isDefaultList: FilterQuery<ShoppingList> = {
-    _id: auth.defaultShoppingList,
-  };
+  const isDefaultList = { _id: auth.defaultShoppingList ?? null };
 
-  // The user owns the list
   const owned = { "owner._id": userId };
-
-  if (!isSubscribed) {
-    return this.find({ $or: [isDefaultList, owned] });
-  }
-
-  let premiumQuery: FilterQuery<ShoppingList>;
-
-  // The owner of the list has an active subscription
-  const ownerIsSubscribed = {
-    "owner.subscription_expires": { $gt: new Date() },
-  };
-
-  // The user has an active subscription and is a member of the list
   const isMember = { "members._id": userId };
 
-  switch (mode) {
-    case "delete":
-      // The user owns the list. They can delete it with or without a subscription
-      premiumQuery = owned;
-      break;
-    case "update":
-      // The user either owns the list or is a member of a list which is owned by a user with an active subscription
-      premiumQuery = { $or: [owned, { $and: [isMember, ownerIsSubscribed] }] };
-      break;
-    case "view":
-      // The user owns the list or is a member of the list.
-      // Ignores list owner's subscription status.
-      premiumQuery = { $or: [owned, isMember] };
-      break;
+  const ownerIsSubscribed = {
+    "owner.subscriptionExpires": { $gt: new Date() },
+  };
+
+  let query: FilterQuery<ShoppingList>;
+
+  if (!isPremium) {
+    switch (mode) {
+      case "delete":
+        query = owned;
+        break;
+      case "update":
+        query = isDefaultList;
+        break;
+      case "view":
+        query = owned;
+        break;
+    }
+  } else {
+    switch (mode) {
+      case "delete":
+        query = owned;
+        break;
+      case "update":
+        query = { $or: [owned, { $and: [isMember, ownerIsSubscribed] }] };
+        break;
+      case "view":
+        query = { $or: [owned, isMember] };
+        break;
+    }
   }
 
-  return this.find({ $or: [isDefaultList, premiumQuery] });
-};
-
-/**
- * Create a shopping list safely. Sets the owner to the requesting user id.
- * ShoppingLists can be created if:
- * Free:
- *  - The user does not have a default ShoppingList
- * Premium:
- *  - Always
- * @param auth The user to create with
- * @param data The shopping list data
- */
-ShoppingListSchema.statics.createAuthorized = async function (
-  auth: Express.User,
-  data: Partial<ShoppingList>
-) {
-  const id = auth._id;
-  const isPremium = auth.subscription_expires > new Date();
-
-  if (!isPremium && auth.defaultShoppingList) {
-    return Promise.reject(
-      AuthErrors.PREMIUM_FEATURE(
-        "A paid account is required to create more than one Shopping List"
-      )
-    );
-  }
-
-  const newList = await ShoppingListModel.create({
-    ...data,
-    owner: {
-      _id: id,
-      name: auth.name,
-      photoUrl: auth.photoUrl,
-      subscription_expires: auth.subscription_expires,
-    },
-  });
-
-  // If this is the user's first ShoppingList, specify this
-  if (!auth.defaultLocation) {
-    await UserModel.updateOne(
-      { _id: id },
-      { defaultShoppingList: newList._id }
-    );
-  }
-
-  return newList;
+  return this.find(query);
 };
 
 const ShoppingListModel = model<ShoppingList, ShoppingListModel>(
