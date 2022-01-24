@@ -5,15 +5,6 @@
     "version": "1.0",
     "title": "Inventory API"
   },
-  "components": {
-    "securitySchemes": {
-      "BearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT"
-      }
-    }
-  },
   "security": [
     {
       "BearerAuth": []
@@ -25,6 +16,9 @@
     }
   ],
   "paths": {
+    "/login": {
+      "security": []
+    },
     "/locations": {
       "post": {
         "summary": "Create a Location",
@@ -34,20 +28,20 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/definitions/LocationCreateBody"
+                "$ref": "#/components/schemas/LocationCreateBody"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "400": {
-            "$ref": "#/definitions/BadFormatResponse"
+            "$ref": "#/components/responses/BadFormatResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           }
         }
       },
@@ -69,18 +63,18 @@
             "description": "Field to sort Locations by",
             "schema": {
               "type": "string",
-              "default": "name",
-              "enum": ["name", "createdAt", "updatedAt"]
+              "default": "lastOpened",
+              "enum": ["name", "createdAt", "updatedAt", "lastOpened"]
             }
           },
           {
-            "$ref": "#/definitions/OrderQuery"
+            "$ref": "#/components/parameters/OrderQuery"
           },
           {
-            "$ref": "#/definitions/LimitQuery"
+            "$ref": "#/components/parameters/LimitQuery"
           },
           {
-            "$ref": "#/definitions/OffsetQuery"
+            "$ref": "#/components/parameters/OffsetQuery"
           }
         ],
         "responses": {
@@ -91,17 +85,17 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/LocationBasic"
+                    "$ref": "#/components/schemas/LocationBasic"
                   }
                 }
               }
             }
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -112,7 +106,7 @@
         "description": "Get a Location by ID. Will only return a Location if a user is authorized to see it. Users with a free account can view Locations that they own and the one shared Location they are allowed to join. Premium users can view Locations that they own or are a member of.",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           }
         ],
         "responses": {
@@ -121,25 +115,25 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/definitions/LocationBasic"
+                  "$ref": "#/components/schemas/LocationBasicValue"
                 }
               }
             }
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       },
       "put": {
         "summary": "Update a Location",
-        "description": "Update the Location with the given ID. Updatable fields include name, iconName, and notificationDays. Users with free accounts can update their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can update Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription",
+        "description": "Update the Location with the given ID. Updatable fields include name, iconName, lastUpdated, notes, and notificationDays. Users with free accounts can update their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can update Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           }
         ],
         "requestBody": {
@@ -147,23 +141,23 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/definitions/LocationUpdateBody"
+                "$ref": "#/components/schemas/LocationUpdateBody"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "400": {
-            "$ref": "#/definitions/BadFormatResponse"
+            "$ref": "#/components/responses/BadFormatResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       },
@@ -172,18 +166,18 @@
         "description": "Delete a Location by ID. Users can delete Locations that they own, regardless of subscription status.",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -191,21 +185,21 @@
     "/locations/{id}/join": {
       "post": {
         "summary": "Join a Location",
-        "description": "Add the requesting user as a member of the Location with the given ID. Free users can join up to one Location owned by a premium user, and premium users can join unlimited Locations owned by premium users",
+        "description": "Add the requesting user as a member of the Location with the given ID. Free users can join up to one Location owned by a premium user, and premium users can join unlimited Locations owned by premium users. If a free user does not have a default shared location but is a member of another location from when they had a previous subscription, rejoining that location will set that location as their default shared location.",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -213,21 +207,21 @@
     "/locations/{id}/leave": {
       "post": {
         "summary": "Leave a Location",
-        "description": "Remove the requesting member as a member of the Location with the given ID. Free users can remove themselves from their default shared Location, and premium users can remove themselves from any Location they are a member of. This is the same as doing a DELETE request to /locations/{id}/members/{memberId} where memberId is the requesting user id.",
+        "description": "Remove the requesting member as a member of the Location with the given ID. Free users can remove themselves from their default shared Location, and premium users can remove themselves from any Location they are a member of.",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -238,11 +232,12 @@
         "description": "Remove the member with the given ID from the Location with the given ID. Free users can remove members from their default shared Location, given that the owner has an active subscription. Premium users can remove members from Locations which they own or are a member of, provided that the owner has an active subscription.",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           },
           {
             "in": "path",
             "name": "memberId",
+            "required": true,
             "description": "The ID of the member to remove",
             "schema": {
               "type": "string"
@@ -251,13 +246,13 @@
         ],
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -268,7 +263,7 @@
         "description": "Add an Item to the Location with the given ID. Free users can add Items to their default owned Location or their default shared Location, provided that the owner has an active subscription. Premium users can add Items to Locations which they own or are a member or, provided that the owner has an active subscription.",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           }
         ],
         "requestBody": {
@@ -276,23 +271,23 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/definitions/ItemCreateBody"
+                "$ref": "#/components/schemas/ItemCreateBody"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "400": {
-            "$ref": "#/definitions/BadFormatResponse"
+            "$ref": "#/components/responses/BadFormatResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       },
@@ -300,6 +295,9 @@
         "summary": "Get Items in a Location",
         "description": "Get a list of all of the Items in the given Location. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of Items can be searched by name",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/LocationIdParam"
+          },
           {
             "in": "query",
             "name": "q",
@@ -327,34 +325,34 @@
             }
           },
           {
-            "$ref": "#/definitions/OrderQuery"
+            "$ref": "#/components/parameters/OrderQuery"
           },
           {
-            "$ref": "#/definitions/LimitQuery"
+            "$ref": "#/components/parameters/LimitQuery"
           },
           {
-            "$ref": "#/definitions/OffsetQuery"
+            "$ref": "#/components/parameters/OffsetQuery"
           }
         ],
         "responses": {
           "200": {
-            "description": "The Location with a list of Items",
+            "description": "A list of Items",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/definitions/Item"
+                    "$ref": "#/components/schemas/Item"
                   }
                 }
               }
             }
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -365,10 +363,10 @@
         "description": "Get the Item with the given ID from the Location with the given ID. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of. Items can be searched by name",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           },
           {
-            "$ref": "#/definitions/ItemIdParam"
+            "$ref": "#/components/parameters/ItemIdParam"
           }
         ],
         "responses": {
@@ -377,16 +375,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/definitions/ItemWithLocation"
+                  "$ref": "#/components/schemas/ItemWithLocation"
                 }
               }
             }
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       },
@@ -395,10 +393,10 @@
         "description": "Update the Item with the given ID in the Location with the given ID. Updatable fields include name, category, iconName, added, expirationDate, opened, purchaseLocation, notes, price. Users with free accounts can update Items in their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can update Items in Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           },
           {
-            "$ref": "#/definitions/ItemIdParam"
+            "$ref": "#/components/parameters/ItemIdParam"
           }
         ],
         "requestBody": {
@@ -406,23 +404,23 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/definitions/ItemUpdateBody"
+                "$ref": "#/components/schemas/ItemUpdateBody"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "400": {
-            "$ref": "#/definitions/BadFormatResponse"
+            "$ref": "#/components/responses/BadFormatResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       },
@@ -431,21 +429,21 @@
         "description": "Delete the Item with the given ID from the Location with the given ID. Users with free accounts can delete Items in their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can delete Items in Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription",
         "parameters": [
           {
-            "$ref": "#/definitions/LocationIdParam"
+            "$ref": "#/components/parameters/LocationIdParam"
           },
           {
-            "$ref": "#/definitions/ItemIdParam"
+            "$ref": "#/components/parameters/ItemIdParam"
           }
         ],
         "responses": {
           "200": {
-            "$ref": "#/definitions/SuccessResponse"
+            "$ref": "#/components/responses/SuccessResponse"
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
@@ -482,13 +480,13 @@
             }
           },
           {
-            "$ref": "#/definitions/OrderQuery"
+            "$ref": "#/components/parameters/OrderQuery"
           },
           {
-            "$ref": "#/definitions/LimitQuery"
+            "$ref": "#/components/parameters/LimitQuery"
           },
           {
-            "$ref": "#/definitions/OffsetQuery"
+            "$ref": "#/components/parameters/OffsetQuery"
           }
         ],
         "responses": {
@@ -497,508 +495,1136 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/definitions/ItemWithLocation"
+                  "$ref": "#/components/schemas/ItemWithLocation"
                 }
               }
             }
           },
           "401": {
-            "$ref": "#/definitions/UnauthorizedResponse"
+            "$ref": "#/components/responses/UnauthorizedResponse"
           },
           "404": {
-            "$ref": "#/definitions/NotFoundResponse"
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists": {
+      "post": {
+        "summary": "Create a Shopping List",
+        "description": "Create a new Shopping List for the requesting user. Users with free accounts can create up to one Shopping List at a time. Premium users can create unlimited Shopping Lists.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          }
+        }
+      },
+      "get": {
+        "summary": "Get all Shopping Lists",
+        "description": "Get a list of all Shopping Lists. Free users can view Shopping Lists which they own. Premium users can view Shopping Lists which they own or are a member of. Lists are sorted by last updated time.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "sort",
+            "description": "Field to sort Shopping Lists by",
+            "schema": {
+              "type": "string",
+              "default": "updatedAt",
+              "enum": ["name", "createdAt", "updatedAt"]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/OrderQuery"
+          },
+          {
+            "$ref": "#/components/parameters/LimitQuery"
+          },
+          {
+            "$ref": "#/components/parameters/OffsetQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of Shopping Lists",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ShoppingListBasic"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists/{id}": {
+      "get": {
+        "summary": "Get a Shopping List by ID",
+        "description": "Get a Shopping List by ID. Will only return a Shopping List if a user is authorized to view it. Free users can view Shopping Lists which they own. Premium users can view Shopping Lists which they own or are a member of.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The requested Shopping List object",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShoppingList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update a Shopping List",
+        "description": "Update the Shopping List with the given ID. Updatable fields include name and notes. Users with free accounts can update their default Shopping List. Premium users can update Shopping Lists which they own or are a member of, provided that the owner has an active subscription.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a Shopping List",
+        "description": "Delete a Shopping List. Users can delete Shopping Lists which they own, regardless of subscription status.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists/{id}/join": {
+      "post": {
+        "summary": "Join a Shopping List",
+        "description": "Add the requesting user as a member of the Shopping List with the given ID. Only Premium users can join Shopping Lists, and the owner of the Shopping List must have an active subscription.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists/{id}/leave": {
+      "post": {
+        "summary": "Leave a Shopping List",
+        "description": "Remove the requesting member as a member of the Shopping List with the given ID. Premium users can leave Shopping Lists which they are a member of",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists/{id}/members/{memberId}": {
+      "delete": {
+        "summary": "Remove a member from a Shopping List",
+        "description": "Remove the member with the given ID from the Shopping List with the given ID. Premium users can remove members from Shopping Lists which they own or are a member of, provided that the owner has an active subscription.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          },
+          {
+            "in": "path",
+            "name": "memberId",
+            "required": true,
+            "description": "The ID of the member to remove",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists/{id}/items": {
+      "post": {
+        "summary": "Add an Item to a Shopping List",
+        "description": "Add an Item to the Shopping List with the given ID. Free users can add Items to their default Shopping List. Premium users can add Items to Shopping Lists which they own or are a member or, provided that the owner has an active subscription.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListItemCreateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+    "/lists/{id}/items/{itemId}": {
+      "put": {
+        "summary": "Update an Item in a Shopping List",
+        "description": "Update the Item with the given ID in the Shopping List with the given ID. Updatable fields include name, notes, and checked. Users with free accounts can update Items in their default Shopping List. Premium users can update Items in Shopping Lists that they own or that they are a member of, provided that the owner of the Location has an active subscription",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/ListItemIdParam"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ListItemUpdateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an Item from a Shopping List",
+        "description": "Delete the Item with the given ID from the Shopping List with the given ID. Users with free accounts can update Items in their default Shopping List. Premium users can update Items in Shopping Lists that they own or that they are a member of, provided that the owner of the Location has an active subscription",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ListIdParam"
+          },
+          {
+            "$ref": "#/components/parameters/ListItemIdParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
           }
         }
       }
     }
   },
-  "definitions": {
-    "LocationBasic": {
-      "type": "object",
-      "required": [
-        "id",
-        "name",
-        "iconName",
-        "owner",
-        "notificationDays",
-        "items",
-        "members",
-        "createdAt",
-        "updatedAt"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/ObjectID"
-        },
-        "name": {
-          "$ref": "#/definitions/LocationName"
-        },
-        "iconName": {
-          "$ref": "#/definitions/LocationIconName"
-        },
-        "owner": {
-          "$ref": "#/definitions/BaseUserWithExpiry"
-        },
-        "members": {
-          "type": "array",
-          "description": "A list of members of the Location",
-          "items": {
-            "$ref": "#/definitions/BaseUser"
-          }
-        },
-        "notificationDays": {
-          "$ref": "#/definitions/LocationNotificationDays"
-        },
-        "items": {
-          "type": "integer",
-          "description": "The number of Items in the Location"
-        },
-        "notes": {
-          "$ref": "#/definitions/LocationNotes"
-        },
-        "createdAt": {
-          "$ref": "#/definitions/CreatedAt"
-        },
-        "updatedAt": {
-          "$ref": "#/definitions/UpdatedAt"
-        }
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     },
-    "LocationCreateBody": {
-      "type": "object",
-      "required": ["name", "iconName"],
-      "properties": {
-        "name": {
-          "$ref": "#/definitions/LocationName"
-        },
-        "iconName": {
-          "$ref": "#/definitions/LocationIconName"
-        }
-      }
-    },
-    "LocationUpdateBody": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "$ref": "#/definitions/LocationName"
-        },
-        "iconName": {
-          "$ref": "#/definitions/LocationIconName"
-        },
-        "notificationDays": {
-          "$ref": "#/definitions/LocationNotificationDays"
-        }
-      }
-    },
-    "Item": {
-      "type": "object",
-      "required": ["id", "name", "category", "iconName", "owner", "added"],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/ObjectID"
-        },
-        "name": {
-          "$ref": "#/definitions/ItemName"
-        },
-        "category": {
-          "$ref": "#/definitions/ItemCategory"
-        },
-        "iconName": {
-          "$ref": "#/definitions/ItemIconName"
-        },
-        "owner": {
-          "$ref": "#/definitions/BaseUser"
-        },
-        "added": {
-          "$ref": "#/definitions/ItemAdded"
-        },
-        "expirationDate": {
-          "$ref": "#/definitions/ItemExpirationDate"
-        },
-        "opened": {
-          "$ref": "#/definitions/ItemOpened"
-        },
-        "purchaseLocation": {
-          "$ref": "#/definitions/ItemPurchaseLocation"
-        },
-        "notes": {
-          "$ref": "#/definitions/ItemNotes"
-        },
-        "price": {
-          "$ref": "#/definitions/ItemPrice"
-        }
-      }
-    },
-    "ItemWithLocation": {
-      "type": "object",
-      "required": [
-        "id",
-        "name",
-        "category",
-        "iconName",
-        "owner",
-        "added",
-        "location"
-      ],
-      "properties": {
-        "id": {
-          "$ref": "#/definitions/ObjectID"
-        },
-        "name": {
-          "$ref": "#/definitions/ItemName"
-        },
-        "category": {
-          "$ref": "#/definitions/ItemCategory"
-        },
-        "iconName": {
-          "$ref": "#/definitions/ItemIconName"
-        },
-        "owner": {
-          "$ref": "#/definitions/BaseUser"
-        },
-        "added": {
-          "$ref": "#/definitions/ItemAdded"
-        },
-        "expirationDate": {
-          "$ref": "#/definitions/ItemExpirationDate"
-        },
-        "opened": {
-          "$ref": "#/definitions/ItemOpened"
-        },
-        "purchaseLocation": {
-          "$ref": "#/definitions/ItemPurchaseLocation"
-        },
-        "notes": {
-          "$ref": "#/definitions/ItemNotes"
-        },
-        "price": {
-          "$ref": "#/definitions/ItemPrice"
-        },
-        "location": {
-          "type": "object",
-          "description": "Location information for the Item",
-          "properties": {
-            "id": {
-              "$ref": "#/definitions/ObjectID"
-            },
-            "name": {
-              "$ref": "#/definitions/LocationName"
+    "schemas": {
+      "LocationBasic": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "iconName",
+          "owner",
+          "notificationDays",
+          "lastOpened",
+          "items",
+          "members",
+          "lastUpdatedBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LocationName"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/LocationIconName"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/BaseUserWithExpiry"
+          },
+          "members": {
+            "type": "array",
+            "description": "A list of members of the Location",
+            "items": {
+              "$ref": "#/components/schemas/BaseUser"
             }
+          },
+          "notificationDays": {
+            "$ref": "#/components/schemas/LocationNotificationDays"
+          },
+          "items": {
+            "type": "integer",
+            "description": "The number of Items in the Location"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/LocationNotes"
+          },
+          "lastOpened": {
+            "$ref": "#/components/schemas/LocationLastOpened"
+          },
+          "lastUpdatedBy": {
+            "$ref": "#/components/schemas/BaseUser"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/CreatedAt"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/UpdatedAt"
           }
         }
-      }
-    },
-    "ItemCreateBody": {
-      "type": "object",
-      "required": ["name", "category", "iconName"],
-      "properties": {
-        "name": {
-          "$ref": "#/definitions/ItemName"
-        },
-        "category": {
-          "$ref": "#/definitions/ItemCategory"
-        },
-        "iconName": {
-          "$ref": "#/definitions/ItemIconName"
-        },
-        "added": {
-          "$ref": "#/definitions/ItemAdded"
-        },
-        "expirationDate": {
-          "$ref": "#/definitions/ItemExpirationDate"
-        },
-        "opened": {
-          "$ref": "#/definitions/ItemOpened"
-        },
-        "purchaseLocation": {
-          "$ref": "#/definitions/ItemPurchaseLocation"
-        },
-        "notes": {
-          "$ref": "#/definitions/ItemNotes"
-        },
-        "price": {
-          "$ref": "#/definitions/ItemPrice"
+      },
+      "LocationBasic": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "iconName",
+          "owner",
+          "notificationDays",
+          "lastOpened",
+          "items",
+          "members",
+          "lastUpdatedBy",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/LocationName"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/LocationIconName"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/BaseUserWithExpiry"
+          },
+          "members": {
+            "type": "array",
+            "description": "A list of members of the Location",
+            "items": {
+              "$ref": "#/components/schemas/BaseUser"
+            }
+          },
+          "notificationDays": {
+            "$ref": "#/components/schemas/LocationNotificationDays"
+          },
+          "items": {
+            "type": "integer",
+            "description": "The number of Items in the Location"
+          },
+          "totalValue": {
+            "type": "number",
+            "description": "The total value of the Items in this Location",
+            "example": 101.99
+          },
+          "notes": {
+            "$ref": "#/components/schemas/LocationNotes"
+          },
+          "lastOpened": {
+            "$ref": "#/components/schemas/LocationLastOpened"
+          },
+          "lastUpdatedBy": {
+            "$ref": "#/components/schemas/BaseUser"
+          },
+          "createdAt": {
+            "$ref": "#/components/schemas/CreatedAt"
+          },
+          "updatedAt": {
+            "$ref": "#/components/schemas/UpdatedAt"
+          }
         }
-      }
-    },
-    "ItemUpdateBody": {
-      "type": "object",
-      "properties": {
-        "name": {
-          "$ref": "#/definitions/ItemName"
-        },
-        "category": {
-          "$ref": "#/definitions/ItemCategory"
-        },
-        "iconName": {
-          "$ref": "#/definitions/ItemIconName"
-        },
-        "added": {
-          "$ref": "#/definitions/ItemAdded"
-        },
-        "expirationDate": {
-          "$ref": "#/definitions/ItemExpirationDate"
-        },
-        "opened": {
-          "$ref": "#/definitions/ItemOpened"
-        },
-        "purchaseLocation": {
-          "$ref": "#/definitions/ItemPurchaseLocation"
-        },
-        "notes": {
-          "$ref": "#/definitions/ItemNotes"
-        },
-        "price": {
-          "$ref": "#/definitions/ItemPrice"
+      },
+      "LocationCreateBody": {
+        "type": "object",
+        "required": ["name", "iconName"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/LocationName"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/LocationIconName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/LocationNotes"
+          }
         }
-      }
-    },
-    "ObjectID": {
-      "type": "string",
-      "description": "The object's ID",
-      "example": "61de02f2a63cabeaa04db27c"
-    },
-    "LocationName": {
-      "type": "string",
-      "description": "The Location's name",
-      "example": "Julia's Fridge",
-      "maxLength": 100
-    },
-    "LocationIconName": {
-      "type": "string",
-      "description": "The Location's display icon name",
-      "example": "fridge",
-      "maxLength": 100
-    },
-    "LocationNotificationDays": {
-      "type": "array",
-      "description": "How many days before items' expiration dates the requesting user should be notified.",
-      "items": {
-        "type": "integer"
-      }
-    },
-    "LocationNotes": {
-      "type": "string",
-      "description": "Any notes about the Location",
-      "example": "Fridge in the Kitchen",
-      "maxLength": 300
-    },
-    "ItemName": {
-      "type": "string",
-      "description": "The name of the Item",
-      "example": "Whole Milk",
-      "maxLength": 100
-    },
-    "ItemCategory": {
-      "type": "string",
-      "description": "The category of the Item",
-      "example": "grocery",
-      "maxLength": 100
-    },
-    "ItemIconName": {
-      "type": "string",
-      "description": "The display icon name for the Item",
-      "example": "grocery",
-      "maxLength": 100
-    },
-    "ItemExpirationDate": {
-      "type": "string",
-      "format": "date-time",
-      "description": "When the Item expires"
-    },
-    "ItemAdded": {
-      "type": "string",
-      "format": "date-time",
-      "description": "When the Item was added to the Location"
-    },
-    "ItemOpened": {
-      "type": "string",
-      "format": "date-time",
-      "description": "When the Item was opened"
-    },
-    "ItemPurchaseLocation": {
-      "type": "string",
-      "description": "Where the Item was purchased",
-      "example": "Whole Foods",
-      "maxLength": 100
-    },
-    "ItemPrice": {
-      "type": "number",
-      "description": "The price of the Item",
-      "example": 5.99
-    },
-    "ItemNotes": {
-      "type": "string",
-      "description": "Any notes about the Item",
-      "example": "Our favorite pizza!",
-      "maxLength": 300
-    },
-    "CreatedAt": {
-      "type": "string",
-      "description": "When this object was created",
-      "format": "date-time"
-    },
-    "UpdatedAt": {
-      "type": "string",
-      "description": "When this object was last updated",
-      "format": "date-time"
-    },
-    "BaseUser": {
-      "type": "object",
-      "required": ["id", "name", "photoUrl"],
-      "properties": {
-        "id": {
-          "$ref": "#definitions/ObjectID"
-        },
-        "name": {
-          "type": "string",
-          "description": "The User's name",
-          "example": "Julia"
-        },
-        "photoUrl": {
-          "type": "string",
-          "nullable": true,
-          "description": "The url to the User's profile photo",
-          "example": "www.google.com"
+      },
+      "LocationUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/LocationName"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/LocationIconName"
+          },
+          "notificationDays": {
+            "$ref": "#/components/schemas/LocationNotificationDays"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/LocationNotes"
+          },
+          "lastOpened": {
+            "$ref": "#/components/schemas/LocationLastOpened"
+          }
         }
-      }
-    },
-    "BaseUserWithExpiry": {
-      "type": "object",
-      "required": ["id", "name", "photoUrl"],
-      "properties": {
-        "id": {
-          "$ref": "#definitions/ObjectID"
-        },
-        "name": {
-          "type": "string",
-          "description": "The User's name",
-          "example": "Julia"
-        },
-        "photoUrl": {
-          "type": "string",
-          "nullable": true,
-          "description": "The url to the User's profile photo",
-          "example": "www.google.com"
-        },
-        "subscriptionExpires": {
-          "type": "string",
-          "description": "The date which this user's premium subscription expires, if applicable.",
-          "example": "2022-01-11T01:51:19.641Z"
+      },
+      "Item": {
+        "type": "object",
+        "required": ["id", "name", "category", "iconName", "owner", "added"],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/ItemName"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ItemCategory"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/ItemIconName"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/BaseUser"
+          },
+          "added": {
+            "$ref": "#/components/schemas/ItemAdded"
+          },
+          "expirationDate": {
+            "$ref": "#/components/schemas/ItemExpirationDate"
+          },
+          "opened": {
+            "$ref": "#/components/schemas/ItemOpened"
+          },
+          "purchaseLocation": {
+            "$ref": "#/components/schemas/ItemPurchaseLocation"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ItemNotes"
+          },
+          "price": {
+            "$ref": "#/components/schemas/ItemPrice"
+          }
         }
-      }
-    },
-    "SuccessResponse": {
-      "description": "A success message",
-      "content": {
-        "application/json": {
-          "schema": {
+      },
+      "ItemWithLocation": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "category",
+          "iconName",
+          "owner",
+          "added",
+          "location"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "name": {
+            "$ref": "#/components/schemas/ItemName"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ItemCategory"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/ItemIconName"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/BaseUser"
+          },
+          "added": {
+            "$ref": "#/components/schemas/ItemAdded"
+          },
+          "expirationDate": {
+            "$ref": "#/components/schemas/ItemExpirationDate"
+          },
+          "opened": {
+            "$ref": "#/components/schemas/ItemOpened"
+          },
+          "purchaseLocation": {
+            "$ref": "#/components/schemas/ItemPurchaseLocation"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ItemNotes"
+          },
+          "price": {
+            "$ref": "#/components/schemas/ItemPrice"
+          },
+          "location": {
             "type": "object",
-            "required": ["message"],
+            "description": "Location information for the Item",
             "properties": {
-              "message": {
-                "description": "A success message",
-                "type": "string",
-                "example": "Update successful"
+              "id": {
+                "$ref": "#/components/schemas/ObjectID"
+              },
+              "name": {
+                "$ref": "#/components/schemas/LocationName"
               }
             }
           }
         }
-      }
-    },
-    "ErrorResponse": {
-      "application/json": {
-        "schema": {
-          "type": "object",
-          "required": ["name", "statusCode", "message", "details"],
-          "properties": {
-            "name": {
-              "description": "The name of the error",
-              "type": "string",
-              "example": "database-error"
-            },
-            "message": {
-              "description": "A message describing the error",
-              "type": "string",
-              "example": "Record not found"
-            },
-            "statusCode": {
-              "description": "The status code of the error",
-              "type": "string",
-              "example": "404"
-            },
-            "details": {
-              "description": "Error details",
-              "type": "string",
-              "example": "This resource was not found or you do not have permission to access it."
+      },
+      "ItemCreateBody": {
+        "type": "object",
+        "required": ["name", "category", "iconName"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ItemName"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ItemCategory"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/ItemIconName"
+          },
+          "added": {
+            "$ref": "#/components/schemas/ItemAdded"
+          },
+          "expirationDate": {
+            "$ref": "#/components/schemas/ItemExpirationDate"
+          },
+          "opened": {
+            "$ref": "#/components/schemas/ItemOpened"
+          },
+          "purchaseLocation": {
+            "$ref": "#/components/schemas/ItemPurchaseLocation"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ItemNotes"
+          },
+          "price": {
+            "$ref": "#/components/schemas/ItemPrice"
+          }
+        }
+      },
+      "ItemUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ItemName"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ItemCategory"
+          },
+          "iconName": {
+            "$ref": "#/components/schemas/ItemIconName"
+          },
+          "added": {
+            "$ref": "#/components/schemas/ItemAdded"
+          },
+          "expirationDate": {
+            "$ref": "#/components/schemas/ItemExpirationDate"
+          },
+          "opened": {
+            "$ref": "#/components/schemas/ItemOpened"
+          },
+          "purchaseLocation": {
+            "$ref": "#/components/schemas/ItemPurchaseLocation"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ItemNotes"
+          },
+          "price": {
+            "$ref": "#/components/schemas/ItemPrice"
+          }
+        }
+      },
+      "ShoppingList": {
+        "type": "object",
+        "required": ["name", "owner", "items", "members", "lastUpdatedBy"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListNotes"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/BaseUserWithExpiry"
+          },
+          "members": {
+            "type": "array",
+            "description": "The members of the Shopping List",
+            "items": {
+              "$ref": "#/components/schemas/BaseUser"
             }
+          },
+          "items": {
+            "type": "array",
+            "description": "The items in the Shopping List",
+            "items": {
+              "$ref": "#/components/schemas/ListItem"
+            }
+          },
+          "lastUpdatedBy": {
+            "$ref": "#/components/schemas/BaseUser"
+          }
+        }
+      },
+      "ShoppingListBasic": {
+        "type": "object",
+        "required": ["name", "owner", "items", "members", "lastUpdatedBy"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListNotes"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/BaseUserWithExpiry"
+          },
+          "members": {
+            "type": "array",
+            "description": "The members of the Shopping List",
+            "items": {
+              "$ref": "#/components/schemas/BaseUser"
+            }
+          },
+          "items": {
+            "type": "integer",
+            "description": "The number of items in the Shopping List"
+          },
+          "lastUpdatedBy": {
+            "$ref": "#/components/schemas/BaseUser"
+          }
+        }
+      },
+      "ListCreateBody": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListItemName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListItemNotes"
+          }
+        }
+      },
+      "ListUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListItemName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListItemNotes"
+          },
+          "newOrder": {
+            "description": "The new order of Items in the Shopping List",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ListItemOrder"
+            }
+          }
+        }
+      },
+      "ListItem": {
+        "type": "object",
+        "required": ["name", "checked"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListItemName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListItemNotes"
+          },
+          "checked": {
+            "$ref": "#/components/schemas/ListItemChecked"
+          },
+          "pos": {
+            "$ref": "#/components/schemas/ListItemOrder"
+          }
+        }
+      },
+      "ListItemCreateBody": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListItemName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListItemNotes"
+          },
+          "checked": {
+            "$ref": "#/components/schemas/ListItemChecked"
+          }
+        }
+      },
+      "ListItemUpdateBody": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/ListItemName"
+          },
+          "notes": {
+            "$ref": "#/components/schemas/ListItemNotes"
+          },
+          "checked": {
+            "$ref": "#/components/schemas/ListItemChecked"
+          }
+        }
+      },
+      "ObjectID": {
+        "type": "string",
+        "pattern": "^[a-z0-9]{24}$",
+        "description": "The object's ID"
+      },
+      "LocationName": {
+        "type": "string",
+        "description": "The Location's name",
+        "example": "Julia's Fridge",
+        "maxLength": 100
+      },
+      "LocationIconName": {
+        "type": "string",
+        "description": "The Location's display icon name",
+        "example": "fridge",
+        "maxLength": 100
+      },
+      "LocationNotificationDays": {
+        "type": "array",
+        "description": "How many days before items' expiration dates the requesting user should be notified.",
+        "items": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30
+        }
+      },
+      "LocationLastOpened": {
+        "type": "string",
+        "format": "date-time",
+        "description": "When this Location was last accessed by the requesting user"
+      },
+      "LocationNotes": {
+        "type": "string",
+        "description": "Any notes about the Location",
+        "example": "Fridge in the Kitchen",
+        "maxLength": 300
+      },
+      "ItemName": {
+        "type": "string",
+        "description": "The name of the Item",
+        "example": "Whole Milk",
+        "maxLength": 100
+      },
+      "ItemCategory": {
+        "type": "string",
+        "description": "The category of the Item",
+        "example": "grocery",
+        "maxLength": 100
+      },
+      "ItemIconName": {
+        "type": "string",
+        "description": "The display icon name for the Item",
+        "example": "grocery",
+        "maxLength": 100
+      },
+      "ItemExpirationDate": {
+        "type": "string",
+        "format": "date-time",
+        "description": "When the Item expires"
+      },
+      "ItemAdded": {
+        "type": "string",
+        "format": "date-time",
+        "description": "When the Item was added to the Location"
+      },
+      "ItemOpened": {
+        "type": "string",
+        "format": "date-time",
+        "description": "When the Item was opened"
+      },
+      "ItemPurchaseLocation": {
+        "type": "string",
+        "description": "Where the Item was purchased",
+        "example": "Whole Foods",
+        "maxLength": 100
+      },
+      "ItemPrice": {
+        "type": "number",
+        "description": "The price of the Item",
+        "example": 5.99
+      },
+      "ItemNotes": {
+        "type": "string",
+        "description": "Any notes about the Item",
+        "example": "Our favorite pizza!",
+        "maxLength": 300
+      },
+      "ListName": {
+        "type": "string",
+        "description": "The name of the Shopping List",
+        "example": "Whole Foods Shopping List",
+        "maxLength": 100
+      },
+      "ListNotes": {
+        "type": "string",
+        "description": "Any notes about the Shopping List",
+        "example": "List for this weekend",
+        "maxLength": 300
+      },
+      "ListItemName": {
+        "type": "string",
+        "description": "The name of the item",
+        "example": "Eggs",
+        "maxLength": 100
+      },
+      "ListItemNotes": {
+        "type": "string",
+        "description": "Any notes about the item",
+        "example": "2% milk",
+        "maxLength": 300
+      },
+      "ListItemChecked": {
+        "type": "boolean",
+        "description": "Whether this item is checked off in the list"
+      },
+      "ListItemOrder": {
+        "type": "integer",
+        "description": "The order of this Item in the Shopping List",
+        "minimum": 0
+      },
+      "CreatedAt": {
+        "type": "string",
+        "description": "When this object was created",
+        "format": "date-time"
+      },
+      "UpdatedAt": {
+        "type": "string",
+        "description": "When this object was last updated",
+        "format": "date-time"
+      },
+      "BaseUser": {
+        "type": "object",
+        "required": ["id", "name", "photoUrl"],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "name": {
+            "type": "string",
+            "description": "The User's name",
+            "example": "Julia"
+          },
+          "photoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "The url to the User's profile photo",
+            "example": "www.google.com"
+          }
+        }
+      },
+      "BaseUserWithExpiry": {
+        "type": "object",
+        "required": ["id", "name", "photoUrl"],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/ObjectID"
+          },
+          "name": {
+            "type": "string",
+            "description": "The User's name",
+            "example": "Julia"
+          },
+          "photoUrl": {
+            "type": "string",
+            "nullable": true,
+            "description": "The url to the User's profile photo",
+            "example": "www.google.com"
+          },
+          "isSubscribed": {
+            "type": "boolean",
+            "description": "Whether this user's subscription is active at the time of retrieval"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["name", "statusCode", "message", "details"],
+        "properties": {
+          "name": {
+            "description": "The name of the error",
+            "type": "string",
+            "example": "database-error"
+          },
+          "message": {
+            "description": "A message describing the error",
+            "type": "string",
+            "example": "Record not found"
+          },
+          "statusCode": {
+            "description": "The status code of the error",
+            "type": "string",
+            "example": "404"
+          },
+          "details": {
+            "description": "Error details",
+            "type": "string",
+            "example": "This resource was not found or you do not have permission to access it."
           }
         }
       }
     },
-    "NotFoundResponse": {
-      "description": "The requested resource was not found or the user's account level does not have permission to access it.",
-      "content": {
-        "$ref": "#/definitions/ErrorResponse"
+    "parameters": {
+      "LimitQuery": {
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "description": "The maximum number of results to return",
+        "schema": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 0,
+          "maximum": 50
+        }
+      },
+      "OffsetQuery": {
+        "in": "query",
+        "name": "offset",
+        "required": false,
+        "description": "Offset of results to return",
+        "schema": {
+          "type": "integer",
+          "default": "0",
+          "minimum": 0
+        }
+      },
+      "OrderQuery": {
+        "in": "query",
+        "name": "order",
+        "required": false,
+        "description": "Whether to sort in descending order",
+        "schema": {
+          "type": "string",
+          "enum": ["asc", "desc"],
+          "default": "asc"
+        }
+      },
+      "LocationIdParam": {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "description": "The ID of the Location",
+        "schema": {
+          "$ref": "#/components/schemas/ObjectID"
+        }
+      },
+      "ItemIdParam": {
+        "in": "path",
+        "name": "itemId",
+        "required": true,
+        "description": "The ID of the Item",
+        "schema": {
+          "$ref": "#/components/schemas/ObjectID"
+        }
+      },
+      "ListIdParam": {
+        "in": "path",
+        "name": "id",
+        "required": true,
+        "description": "The ID of the Shopping List",
+        "schema": {
+          "$ref": "#/components/schemas/ObjectID"
+        }
+      },
+      "ListItemIdParam": {
+        "in": "path",
+        "name": "itemId",
+        "required": true,
+        "description": "The ID of item in the Shopping List",
+        "schema": {
+          "$ref": "#/components/schemas/ObjectID"
+        }
       }
     },
-    "UnauthorizedResponse": {
-      "description": "User is unauthorized. This can be due to invalid credentials or not having a premium account.",
-      "content": {
-        "$ref": "#/definitions/ErrorResponse"
-      }
-    },
-    "BadFormatResponse": {
-      "description": "The request was formed badly. Perhaps required fields are missing or invalid in the request body.",
-      "content": {
-        "$ref": "#/definitions/ErrorResponse"
-      }
-    },
-    "LimitQuery": {
-      "in": "query",
-      "name": "limit",
-      "description": "The maximum number of results to return",
-      "schema": {
-        "type": "integer",
-        "default": 30,
-        "minimum": 0,
-        "maximum": 50
-      }
-    },
-    "OffsetQuery": {
-      "in": "query",
-      "name": "offset",
-      "description": "Offset of results to return",
-      "schema": {
-        "type": "integer",
-        "default": "0",
-        "minimum": 0
-      }
-    },
-    "OrderQuery": {
-      "in": "query",
-      "name": "order",
-      "description": "Whether to sort in descending order",
-      "schema": {
-        "type": "string",
-        "enum": ["asc", "desc"],
-        "default": "asc"
-      }
-    },
-    "LocationIdParam": {
-      "in": "path",
-      "name": "id",
-      "description": "The ID of the Location",
-      "schema": {
-        "type": "string"
-      }
-    },
-    "ItemIdParam": {
-      "in": "path",
-      "name": "itemId",
-      "description": "The ID of the Item",
-      "schema": {
-        "type": "string"
+    "responses": {
+      "SuccessResponse": {
+        "description": "A success message",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["message"],
+              "properties": {
+                "message": {
+                  "description": "A success message",
+                  "type": "string",
+                  "example": "Update successful"
+                }
+              }
+            }
+          }
+        }
+      },
+      "NotFoundResponse": {
+        "description": "The requested resource was not found or the user's account level does not have permission to access it.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "UnauthorizedResponse": {
+        "description": "User is unauthorized. This can be due to invalid credentials or not having a premium account.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "BadFormatResponse": {
+        "description": "The request was formed badly. Perhaps required fields are missing or invalid in the request body.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
       }
     }
   }
