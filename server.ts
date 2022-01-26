@@ -21,7 +21,7 @@ import express, { NextFunction, Request, Response } from "express";
 import cron from "node-cron";
 
 import passport from "./passport/setup";
-import mongoose, { HydratedDocument, Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 
 import UserModel from "./schema/user.schema";
 import LocationModel from "./schema/location.schema";
@@ -30,8 +30,8 @@ import ShoppingListModel from "./schema/shoppingList.schema";
 import locations from "./routes/location.routes";
 import auth from "./routes/auth.routes";
 import users from "./routes/user.routes";
-import profiles from "./routes/profile.routes";
-import items from "./routes/items.routes";
+import profile from "./routes/profile.routes";
+import upc from "./routes/upc.routes";
 import ErrorResponse from "./error/ErrorResponse";
 
 var app = express();
@@ -56,17 +56,7 @@ db.mongoose
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-
 app.use(passport.initialize());
-
-app.use(function (req, res, next) {
-  res.sendNotFoundError = (msg) => res.status(404).send({ error: msg });
-  res.sendInternalError = (msg) => res.status(500).send({ error: msg });
-  res.sendEmptyError = () =>
-    res.status(400).send({ error: "Request body cannot be empty." });
-
-  next();
-});
 
 const jwtAuth = passport.authenticate("jwt", { session: false });
 
@@ -76,10 +66,10 @@ app.use("/docs", (req, res) => {
 });
 
 app.use("/api/v1/auth", auth);
-app.use("/api/v1/profile", jwtAuth, profiles);
+app.use("/api/v1/profile", jwtAuth, profile);
 app.use("/api/v1/users", jwtAuth, users);
 app.use("/api/v1/locations", jwtAuth, locations);
-app.use("/api/v1/items", jwtAuth, items);
+app.use("/api/v1/upc", jwtAuth, upc);
 
 app.all("*", (req, res, next) => {
   return next(

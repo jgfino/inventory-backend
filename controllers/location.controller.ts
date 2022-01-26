@@ -94,6 +94,7 @@ export const createLocation = catchAsync(async (req, res, next) => {
  * - Limit/offset supported
  * - Search by Location name
  * - Sort by name, createdAt, updatedAt, lastOpened
+ * - Filter by owner id, member id
  */
 export const getLocations = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
@@ -101,7 +102,12 @@ export const getLocations = authorizeAndCatchAsync(
     const conditions: any = {};
 
     const { order, limit, offset } = parsePaginationQuery(query);
+
     query.q && (conditions.name = new RegExp(String(query.q), "i"));
+
+    query.owner && (conditions["owner._id"] = String(query.owner));
+    query.member && (conditions["members._id"] = String(query.member));
+
     const sortField = query.sort ? String(query.sort) : "lastOpened";
 
     const aggregation = await LocationModel.aggregate([
@@ -528,20 +534,29 @@ export const addItem = authorizeAndCatchAsync(
 );
 
 /**
- * Get a list of all of the Items in the given Location. Items can be searched
- * by name
+ * et a list of all of the Items in the given Location. Users with a free
+ * account can view Items in Locations that they own and the one shared Location
+ * they are allowed to join. Premium users can view Items in Locations that they
+ * own or are a member of Items can be searched by name. Items can be filtered
+ * by owner.
  */
 export const getItems = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const query = req.query;
+
+    const conditions = {
+      $and: [
+        locationModel.getFilter(),
+        { _id: new Types.ObjectId(req.params.id) },
+      ],
+    };
+
+    query.owner &&
+      (conditions["owner._id"] = new Types.ObjectId(query.owner as string));
+
     const pipeline: any[] = [
       {
-        $match: {
-          $and: [
-            locationModel.getFilter(),
-            { _id: new Types.ObjectId(req.params.id) },
-          ],
-        },
+        $match: conditions,
       },
       ...paginateNestedArrayPipeline(query, {
         arrayField: "items",

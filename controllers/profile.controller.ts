@@ -5,9 +5,10 @@ import { VerifyEmailTemplate } from "../nodemailer/templates.nodemailer";
 import { sendSMS } from "../twilio/sms";
 import { VerifyPhoneTemplate } from "../twilio/templates.twilio";
 import AuthErrors from "../error/errors/auth.errors";
+import aws from "aws-sdk";
 
 /**
- * Get the currently logged-in user
+ * Get the full profile for the currently logged-in user
  */
 export const getProfile = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
@@ -20,7 +21,34 @@ export const getProfile = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Delete the currently logged-in user
+ * Update the currently logged-in user's profile. Updatable fields include name,
+ * email, phone, and password. Updating email or phone will unverify any
+ * verified email address or phone number.
+ */
+export const updateProfile = catchAsync(async (req, res, next) => {
+  const { name, email, phone, password } = req.body;
+  const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
+  name !== undefined && (user.name = name);
+  email !== undefined && (user.email = email);
+  phone !== undefined && (user.phone = phone);
+  password !== undefined && (user.password = password);
+
+  await user.save();
+
+  res.status(200).json({
+    message: "User updated successfully",
+  });
+});
+
+/**
+ * Delete the currently logged-in user's profile. WARNING: this will delete all
+ * user data as well as Locations, Items, Shopping Lists owned by this user. Use
+ * with caution.
  */
 export const deleteProfile = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
@@ -33,26 +61,64 @@ export const deleteProfile = catchAsync(async (req, res, next) => {
   res.status(200).send({ message: "User deleted successfully" });
 });
 
-/**
- * Updates the current user. Updatable fields include email, phone, name.
- */
-export const updateProfile = catchAsync(async (req, res, next) => {
-  const body = req.body;
-  const user = await UserModel.findById(req.user._id);
-
-  body.name !== undefined && (user.name = body.name);
-  body.email !== undefined && (user.email = body.email);
-  body.phone !== undefined && (user.phone = body.phone);
-
-  await user.save();
-  res.status(200).json({
-    message: "User updated successfully",
-  });
+const s3 = new aws.S3({
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_ACCESS_KEY_SECRET,
+  },
 });
 
 /**
- * Send a verification email to the logged-in user's email address. Errors
- * if the logged in user does not have a registered email address.
+ * Update the profile image for the currently logged-in user.
+ */
+export const addPhoto = catchAsync(async (req, res, next) => {
+  const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: req.user._id.toString() + "-full.jpg",
+    Body: req.file.buffer,
+    ACL: "public-read-write",
+    ContentType: "image/jpeg",
+  };
+
+  const data = await s3.upload(params).promise();
+  user.photoUrl = data.Location;
+
+  await user.save();
+
+  res.status(200).send({ message: "Photo added successfully." });
+});
+
+/**
+ * Delete the profile image for the currently logged-in user.
+ */
+export const removePhoto = catchAsync(async (req, res, next) => {
+  const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
+  await s3
+    .deleteObject({
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: req.user._id.toString() + "-full.jpg",
+    })
+    .promise();
+
+  user.photoUrl = undefined;
+  await user.save();
+
+  res.status(200).send({ message: "Photo removed successfully." });
+});
+
+/**
+ * Send a verification email to the currently logged-in user.
  */
 export const sendVerificationEmail = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
@@ -70,11 +136,12 @@ export const sendVerificationEmail = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Verify the logged-in user's email address using the provided code.
+ * Verify the currently logged-in user's email address using the code they
+ * received.
  */
 export const verifyEmail = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
-  const code = (req.query.code as string) ?? "";
+  const code = req.query.code as string;
 
   if (!user || !user.email) {
     return next(AuthErrors.NO_EMAIL);
@@ -88,8 +155,7 @@ export const verifyEmail = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Send a phone number verification code to the logged-in user's phone number.
- * Errors if the logged in user does not have a registered phone number.
+ * Send a verification text to the currently logged-in user
  */
 export const sendTextVerificationCode = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
@@ -107,7 +173,7 @@ export const sendTextVerificationCode = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Verify the logged-in user's phone number using the given code
+ * Verify the currently logged-in user's phone number using the code they received
  */
 export const verifyPhone = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
@@ -125,11 +191,15 @@ export const verifyPhone = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Enables 2fa for the logged-in user. 2fa can only be enabled if the user
- * has a registered phone number.
+ * Enables multi-factor authentication for the currently logged-in user.
  */
-export const enable2fa = catchAsync(async (req, res, next) => {
+export const enableMfa = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
   await user.enable2fa();
 
   res.status(200).json({
@@ -138,10 +208,15 @@ export const enable2fa = catchAsync(async (req, res, next) => {
 });
 
 /**
- * Disables 2fa for the logged-in user.
+ * Disables multi-factor authentication for the currently logged-in user.
  */
-export const disable2fa = catchAsync(async (req, res, next) => {
+export const disableMfa = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
+
+  if (!user) {
+    return next(AuthErrors.USER_NOT_FOUND);
+  }
+
   await user.disable2fa();
 
   res.status(200).json({

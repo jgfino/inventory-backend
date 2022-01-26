@@ -19,6 +19,7 @@
     "/auth/login": {
       "security": [],
       "post": {
+        "summary": "Login a user",
         "description": "Login a user with an email/phone number and password.",
         "requestBody": {
           "required": true,
@@ -71,6 +72,7 @@
     "/auth/register": {
       "security": [],
       "post": {
+        "summary": "Register a new user",
         "description": "Register a user with an email/phone number, name, and password. Signs this user in after registration.",
         "requestBody": {
           "required": true,
@@ -120,6 +122,7 @@
     "/auth/token": {
       "security": [],
       "post": {
+        "summary": "Refresh access token",
         "description": "Generate new access and refresh tokens based on the provided ones.",
         "requestBody": {
           "required": true,
@@ -163,15 +166,27 @@
         }
       }
     },
-    "/auth/forgot/{emailOrPhone}": {
+    "/auth/forgot": {
       "security": [],
       "post": {
+        "summary": "Send reset email",
         "description": "Send a password reset code to the provided email or phone number.",
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/EmailOrPhone"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["emailOrPhone"],
+                "properties": {
+                  "emailOrPhone": {
+                    "$ref": "#/components/schemas/EmailOrPhone"
+                  }
+                }
+              }
+            }
           }
-        ],
+        },
         "responses": {
           "200": {
             "$ref": "#/components/responses/SuccessResponse"
@@ -185,13 +200,14 @@
         }
       }
     },
-    "/auth/reset/{emailOrPhone}": {
+    "/auth/reset": {
       "security": [],
       "post": {
+        "summary": "Reset password",
         "description": "Reset the password or user with the given email or phone using the code they received. Also, log them in.",
         "parameters": [
           {
-            "$ref": "#/components/parameters/EmailOrPhone"
+            "$ref": "#/components/parameters/CodeQuery"
           }
         ],
         "requestBody": {
@@ -202,11 +218,11 @@
                 "type": "object",
                 "required": ["password", "code"],
                 "properties": {
+                  "emailOrPhone": {
+                    "$ref": "#/components/schemas/EmailOrPhone"
+                  },
                   "password": {
                     "$ref": "#/components/schemas/Password"
-                  },
-                  "code": {
-                    "$ref": "#/components/schemas/AuthCode"
                   }
                 }
               }
@@ -233,6 +249,314 @@
         }
       }
     },
+    "/profile": {
+      "get": {
+        "summary": "Get current user's profile",
+        "description": "Get the full profile for the currently logged-in user",
+        "responses": {
+          "200": {
+            "description": "The user's full profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      },
+      "put": {
+        "summary": "Update current user's profile",
+        "description": "Update the currently logged-in user's profile. Updatable fields include name, email, phone, and password. Updating email or phone will unverify any verified email address or phone number.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "$ref": "#/components/schemas/Name"
+                  },
+                  "email": {
+                    "$ref": "#/components/schemas/Email"
+                  },
+                  "phone": {
+                    "$ref": "#/components/schemas/Phone"
+                  },
+                  "password": {
+                    "$ref": "#/components/schemas/Password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete current user",
+        "description": "Delete the currently logged-in user's profile. WARNING: this will delete all user data as well as Locations, Items, Shopping Lists owned by this user. Use with caution.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+
+    "/profile/photo": {
+      "put": {
+        "summary": "Update profile image",
+        "description": "Update the profile image for the currently logged-in user.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete profile image",
+        "description": "Delete the profile image for the currently logged-in user.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SuccessResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundResponse"
+          }
+        }
+      }
+    },
+
+    "/profile/verify/email/send": {
+      "summary": "Send a verification email",
+      "description": "Send a verification email to the currently logged-in user",
+      "responses": {
+        "200": {
+          "$ref": "#/components/responses/SuccessResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        },
+        "404": {
+          "$ref": "#/components/responses/NotFoundResponse"
+        }
+      }
+    },
+
+    "/profile/verify/email": {
+      "summary": "Verify current user's email",
+      "description": "Verify the currently logged-in user's email address using the code they received.",
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CodeQuery"
+        }
+      ],
+      "responses": {
+        "200": {
+          "$ref": "#/components/responses/SuccessResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        },
+        "404": {
+          "$ref": "#/components/responses/NotFoundResponse"
+        }
+      }
+    },
+
+    "/profile/verify/phone/send": {
+      "summary": "Send a verification text",
+      "description": "Send a verification text to the currently logged-in user",
+      "responses": {
+        "200": {
+          "$ref": "#/components/responses/SuccessResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        },
+        "404": {
+          "$ref": "#/components/responses/NotFoundResponse"
+        }
+      }
+    },
+
+    "/profile/verify/phone": {
+      "summary": "Verify current user's phone number",
+      "description": "Verify the currently logged-in user's phone number using the code they received.",
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CodeQuery"
+        }
+      ],
+      "responses": {
+        "200": {
+          "$ref": "#/components/responses/SuccessResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        },
+        "404": {
+          "$ref": "#/components/responses/NotFoundResponse"
+        }
+      }
+    },
+
+    "/profile/mfa/enable": {
+      "summary": "Enable multi-factor authentication",
+      "description": "Enables multi-factor authentication for the currently logged-in user. The user must have a verified phone number.",
+      "responses": {
+        "200": {
+          "$ref": "#/components/responses/SuccessResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        },
+        "404": {
+          "$ref": "#/components/responses/NotFoundResponse"
+        }
+      }
+    },
+    "/profile/mfa/disable": {
+      "summary": "Disable multi-factor authentication",
+      "description": "Disables multi-factor authentication for the currently logged-in user.",
+      "responses": {
+        "200": {
+          "$ref": "#/components/responses/SuccessResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        },
+        "404": {
+          "$ref": "#/components/responses/NotFoundResponse"
+        }
+      }
+    },
+
+    "/users/{id}/profile": {
+      "summary": "Get a user's public profile",
+      "description": "Get a user's public profile. Public information includes a user's id, name, photo, number of mutual Locations, how many Locations this user owns as well as how many they are a member of. It also includes the number Items they own across all Locations",
+      "responses": {
+        "200": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "$ref": "#/components/schemas/ObjectID"
+            },
+            "name": {
+              "$ref": "#/components/schemas/Name"
+            },
+            "photoUrl": {
+              "$ref": "#/components/schemas/PhotoUrl"
+            },
+            "ownedLocations": {
+              "description": "The number of Locations the user owns",
+              "type": "number"
+            },
+            "memberLocations": {
+              "description": "The number of Locations the user is a member of.",
+              "type": "number"
+            },
+            "mutualLocations": {
+              "description": "The number of Locations the user shares with the requesting user.",
+              "type": "number"
+            }
+          }
+        },
+        "400": {
+          "$ref": "#/components/responses/BadFormatResponse"
+        },
+        "401": {
+          "$ref": "#/components/responses/UnauthorizedResponse"
+        }
+      }
+    },
+
+    "/upc/{upc}": {
+      "get": {
+        "summary": "Get Item from UPC",
+        "description": "Get Item information from a UPC barcode. Returns item name and brand",
+        "responses": {
+          "200": {
+            "type": "object",
+            "description": "The Item information, if found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "description": "The name (and brand) of the Item",
+                      "example": "Hood Whole Milk"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadFormatResponse"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedResponse"
+          }
+        }
+      }
+    },
+
     "/locations": {
       "post": {
         "summary": "Create a Location",
@@ -261,7 +585,7 @@
       },
       "get": {
         "summary": "Get all Locations",
-        "description": "Get a list of all the Locations the current user has access to. Users with a free account can view Locations that they own and the one shared Location they are allowed to join. Premium users can view Locations that they own or are a member of. Locations can be searched by name",
+        "description": "Get a list of all the Locations the current user has access to. Users with a free account can view Locations that they own and the one shared Location they are allowed to join. Premium users can view Locations that they own or are a member of. Locations can be searched by name and filtered by owner/member.",
         "parameters": [
           {
             "in": "query",
@@ -280,6 +604,12 @@
               "default": "lastOpened",
               "enum": ["name", "createdAt", "updatedAt", "lastOpened"]
             }
+          },
+          {
+            "$ref": "#/components/parameters/OwnerQuery"
+          },
+          {
+            "$ref": "#/components/parameters/MemberQuery"
           },
           {
             "$ref": "#/components/parameters/OrderQuery"
@@ -314,6 +644,7 @@
         }
       }
     },
+
     "/locations/{id}": {
       "get": {
         "summary": "Get a Location by ID",
@@ -507,8 +838,11 @@
       },
       "get": {
         "summary": "Get Items in a Location",
-        "description": "Get a list of all of the Items in the given Location. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of Items can be searched by name",
+        "description": "Get a list of all of the Items in the given Location. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of Items can be searched by name. Items can be filtered by owner.",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerQuery"
+          },
           {
             "$ref": "#/components/parameters/LocationIdParam"
           },
@@ -751,8 +1085,14 @@
       },
       "get": {
         "summary": "Get all Shopping Lists",
-        "description": "Get a list of all Shopping Lists. Free users can view Shopping Lists which they own. Premium users can view Shopping Lists which they own or are a member of. Lists are sorted by last updated time.",
+        "description": "Get a list of all Shopping Lists. Free users can view Shopping Lists which they own. Premium users can view Shopping Lists which they own or are a member of. Lists are sorted by last updated time. Lists can be filtered by owner or member.",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/OwnerQuery"
+          },
+          {
+            "$ref": "#/components/parameters/MemberQuery"
+          },
           {
             "in": "query",
             "name": "sort",
@@ -1074,6 +1414,11 @@
         "description": "The user's name or username",
         "example": "jjfino"
       },
+      "PhotoUrl": {
+        "type": "string",
+        "description": "The url to the User's profile photo",
+        "example": "www.google.com"
+      },
       "Email": {
         "type": "string",
         "description": "The user's email address",
@@ -1083,6 +1428,39 @@
         "type": "string",
         "description": "The user's phone number with country code.",
         "example": "+112345678910"
+      },
+      "EmailVerified": {
+        "type": "boolean",
+        "description": "Whether the user's email has been verified"
+      },
+      "PhoneVerified": {
+        "type": "boolean",
+        "description": "Whether the user's phone number has been verified"
+      },
+      "SubscriptionExpires": {
+        "type": "string",
+        "format": "date-time",
+        "description": "When this user's subscription expires, if applicable"
+      },
+      "DefaultLocation": {
+        "description": "The id of the user's default personal Location",
+        "$ref": "#/components/schemas/ObjectID"
+      },
+      "DefaultSharedLocation": {
+        "description": "The id of the user's default shared Location",
+        "$ref": "#/components/schemas/ObjectID"
+      },
+      "DefaultShoppingList": {
+        "description": "The id of the user's default Shopping List",
+        "$ref": "#/components/schemas/ObjectID"
+      },
+      "MFAEnabled": {
+        "description": "Whether the user has enabled multi/2-factor authentication",
+        "type": "boolean"
+      },
+      "IsSubscribed": {
+        "type": "boolean",
+        "description": "Whether this user's subscription is active at the time of retrieval"
       },
       "Tokens": {
         "type": "object",
@@ -1115,6 +1493,46 @@
         "minimum": 100000,
         "maximum": 999999
       },
+      "FullProfile": {
+        "type": "object",
+        "required": ["name", "mfaEnabled"],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "photoUrl": {
+            "$ref": "#/components/schemas/PhotoUrl"
+          },
+          "email": {
+            "$ref": "#/components/schemas/Email"
+          },
+          "emailVerified": {
+            "$ref": "#/components/schemas/EmailVerified"
+          },
+          "phone": {
+            "$ref": "#/components/schemas/Phone"
+          },
+          "phoneVerified": {
+            "$ref": "#/components/schemas/Name"
+          },
+          "subscriptionExpires": {
+            "$ref": "#/components/schemas/SubscriptionExpires"
+          },
+          "defaultLocation": {
+            "$ref": "#/components/schemas/DefaultLocation"
+          },
+          "defaultSharedLocation": {
+            "$ref": "#/components/schemas/DefaultSharedLocation"
+          },
+          "defautShoppingList": {
+            "$ref": "#/components/schemas/DefaultShoppingList"
+          },
+          "mfaEnabled": {
+            "$ref": "#/components/schemas/MFAEnabled"
+          }
+        }
+      },
+
       "LocationBasic": {
         "type": "object",
         "required": [
@@ -1713,15 +2131,10 @@
             "$ref": "#/components/schemas/ObjectID"
           },
           "name": {
-            "type": "string",
-            "description": "The User's name",
-            "example": "Julia"
+            "$ref": "#/components/schemas/Name"
           },
           "photoUrl": {
-            "type": "string",
-            "nullable": true,
-            "description": "The url to the User's profile photo",
-            "example": "www.google.com"
+            "$ref": "#/components/schemas/PhotoUrl"
           }
         }
       },
@@ -1733,19 +2146,13 @@
             "$ref": "#/components/schemas/ObjectID"
           },
           "name": {
-            "type": "string",
-            "description": "The User's name",
-            "example": "Julia"
+            "$ref": "#/components/schemas/Name"
           },
           "photoUrl": {
-            "type": "string",
-            "nullable": true,
-            "description": "The url to the User's profile photo",
-            "example": "www.google.com"
+            "$ref": "#/components/schemas/PhotoUrl"
           },
           "isSubscribed": {
-            "type": "boolean",
-            "description": "Whether this user's subscription is active at the time of retrieval"
+            "$ref": "#/components/schemas/IsSubscribed"
           }
         }
       },
@@ -1777,6 +2184,22 @@
       }
     },
     "parameters": {
+      "OwnerQuery": {
+        "in": "query",
+        "name": "owner",
+        "description": "The id of the owner of this resource",
+        "schema": {
+          "$ref": "#/components/schemas/ObjectID"
+        }
+      },
+      "MemberQuery": {
+        "in": "query",
+        "name": "member",
+        "description": "The id of the member of this resource",
+        "schema": {
+          "$ref": "#/components/schemas/ObjectID"
+        }
+      },
       "LimitQuery": {
         "in": "query",
         "name": "limit",
@@ -1810,6 +2233,16 @@
           "minimum": 0
         }
       },
+      "CodeQuery": {
+        "in": "query",
+        "name": "code",
+        "required": "true",
+        "description": "The verification code.",
+        "schema": {
+          "$ref": "#/components/schemas/AuthCode"
+        }
+      },
+
       "OrderQuery": {
         "in": "query",
         "name": "order",

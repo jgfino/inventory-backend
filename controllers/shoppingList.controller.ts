@@ -55,15 +55,22 @@ export const createList = catchAsync(async (req, res, next) => {
 /**
  * Get a list of all Shopping Lists. Free users can view Shopping Lists which
  * they own. Premium users can view Shopping Lists which they own or are a
- * member of. Lists are sorted by last updated time.
+ * member of. Lists are sorted by last updated time. Lists can be filtered by
+ * owner or member.
  */
 export const getLists = authorizeAndCatchAsync(
   async (req, res, next, listModel) => {
     const query = req.query;
     const { order, limit, offset } = parsePaginationQuery(query, "desc");
+
     const sortField = query.sort ? String(query.sort) : "updatedAt";
 
+    const conditions = {};
+    query.owner && (conditions["owner._id"] = query.owner);
+    query.member && (conditions["members._id"] = query.member);
+
     const listQuery = listModel
+      .find(conditions)
       .sort({ [sortField]: order })
       .limit(limit)
       .skip(offset);

@@ -1,57 +1,74 @@
-/**
- * Defines routes to access and modify user information for the
- * current user.
- */
-
 import * as profile from "../controllers/profile.controller";
 import express from "express";
+import multer from "multer";
+
+const storage = multer.memoryStorage();
+
+const filefilter = (req, file, cb) => {
+  if (file.mimetype === "image/jpeg" || file.mimetype === "image/jpg") {
+    cb(null, true);
+  } else {
+    cb(null, false);
+  }
+};
+
+const upload = multer({ storage: storage, fileFilter: filefilter });
 
 const router = express.Router();
 
 /**
- * Get the currently logged-in user.
+ * GET /api/v1/profile
  */
 router.get("/", profile.getProfile);
 
 /**
- * Delete the currently logged in user
- */
-router.delete("/", profile.deleteProfile);
-
-/**
- * Update the currently logged in user. Updatable fields include name, email,
- * phone
+ * PUT /api/v1/profile
  */
 router.put("/", profile.updateProfile);
 
 /**
- * Send the logged in user a verification email
+ * DELETE /api/v1/profile
  */
-router.post("/verify/send-email", profile.sendVerificationEmail);
+router.delete("/", profile.deleteProfile);
 
 /**
- * Verify the logged in user's email using a code
+ * POST /api/v1/profile/photo
+ */
+router.put("/photo", upload.single("image"), profile.addPhoto);
+
+/**
+ * DELETE /api/v1/profile/photo
+ */
+router.delete("/photo", profile.removePhoto);
+
+/**
+ * POST /api/v1/profile/verify/email/send
+ */
+router.post("/verify/email/send", profile.sendVerificationEmail);
+
+/**
+ * POST /api/v1/profile/verify/email
  */
 router.post("/verify/email", profile.verifyEmail);
 
 /**
- * Send the logged in user a verification text
+ * POST /api/v1/profile/verify/phone/send
  */
-router.post("/verify/send-text", profile.sendTextVerificationCode);
+router.post("/verify/phone/send", profile.sendTextVerificationCode);
 
 /**
- * Verify the logged in user's phone using a code
+ * POST /api/v1/profile/verify/phone
  */
 router.post("/verify/phone", profile.verifyPhone);
 
 /**
- * Enable 2FA for the logged in user
+ * POST /api/v1/profile/mfa/enable
  */
-router.post("/2fa/enable", profile.enable2fa);
+router.post("/mfa/enable", profile.enableMfa);
 
 /**
- * Disable 2FA for the logged in user
+ * POST /api/v1/profile/mfa/disable
  */
-router.post("/2fa/disable", profile.disable2fa);
+router.post("/mfa/disable", profile.disableMfa);
 
 export default router;

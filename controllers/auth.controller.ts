@@ -107,7 +107,7 @@ export const refreshToken = catchAsync(async (req, res, next) => {
  * Send a password reset code to the provided email or phone number.
  */
 export const forgotPassword = catchAsync(async (req, res, next) => {
-  const emailOrPhone = req.params.emailOrPhone;
+  const emailOrPhone = req.body.emailOrPhone;
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);
 
   if (!user) {
@@ -136,7 +136,7 @@ export const resetPassword = catchAsync(async (req, res, next) => {
   }
 
   const emailOrPhone = req.params.emailOrPhone;
-  const resetCode = req.body.code;
+  const resetCode = req.query.code as string;
   const password = req.body.password;
 
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);

@@ -1,16 +1,10 @@
-/**
- * Defines routes to access and modify user information.
- */
-
 import * as users from "../controllers/user.controller";
 import express from "express";
 
 const router = express.Router();
 
 /**
- * Get a user's public profile information. Public information includes:
- * - id, name, photoUrl
- * - Mutual locations
+ * GET /api/v1/users/{id}/profile
  */
 router.get("/:id/profile", users.getUserProfile);
 

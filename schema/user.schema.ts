@@ -119,7 +119,6 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
     },
     photoUrl: {
       type: String,
-      default: null,
     },
     email: {
       type: String,
@@ -234,6 +233,7 @@ UserSchema.pre("save", async function (next) {
 
   if (this.isModified("phone")) {
     this.phoneVerified = false;
+    this.mfaEnabled = false;
   }
 
   if (!this.isNew) {
@@ -366,20 +366,61 @@ UserSchema.pre("remove", async function (next) {
     promises.push(doc.remove());
   });
 
-  // Remove membership of this user in locations as well as notification info
+  // Remove membership of this user in locations
   promises.push(
     LocationModel.updateMany(
       { members: this._id },
-      { $pull: { members: this._id, notificationDays: { user: this._id } } }
+      {
+        $pull: {
+          members: { _id: this._id },
+          notificationDays: { user: this._id },
+          lastOpened: { user: this._id },
+        },
+      }
+    ).exec()
+  );
+
+  // Remove this user last updating a location
+  promises.push(
+    LocationModel.updateMany(
+      { "lastUpdatedBy._id": this._id },
+      { $set: { lastUpdatedBy: { _id: null, name: "Deleted User" } } }
     ).exec()
   );
 
   // Delete items owned by this user
   promises.push(
     LocationModel.updateMany(
-      { "items.owner.id": this.id },
-      { $pull: { items: { "owner.id": this.id } } }
+      { "items.owner._id": this.id },
+      { $pull: { items: { "owner._id": this.id } } }
     ).exec()
+  );
+
+  // Delete lists owned by this user
+  const lists = await ShoppingListModel.find({ owner: this.id });
+  lists.forEach((doc) => promises.push(doc.remove()));
+
+  // Delete items in lists owned by this user
+  const listsWithItems = await ShoppingListModel.find({
+    "items.owner._id": this._id,
+  });
+  promises.push(
+    listsWithItems.map(async (list) => {
+      // Remove items owned by this user
+      list.items = list.items.filter(
+        (item) => item.owner._id.toString() != this._id.toString()
+      );
+
+      // Sort remaining items by position
+      list.items.sort((a, b) => a.pos - b.pos);
+
+      // Redo item positions
+      for (let i = 0; i < list.items.length; i++) {
+        list.items[i].pos = i;
+      }
+
+      await list.save();
+    })
   );
 
   // Await async operations
