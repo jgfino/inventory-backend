@@ -1,0 +1,1396 @@
+openapi: 3.0.0
+info:
+  description: API Docs for Inventory Management API
+  version: "1.0"
+  title: Inventory API
+security:
+  - BearerAuth: []
+servers:
+  - url: localhost:8080/api/v1
+paths:
+  /auth/login:
+    post:
+      security: []
+      summary: Login a user
+      description: Login a user with an email/phone number and password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emailOrPhone
+                - password
+              properties:
+                emailOrPhone:
+                  $ref: "#/components/schemas/EmailOrPhone"
+                password:
+                  $ref: "#/components/schemas/Password"
+                code:
+                  type: string
+                  description: The 2fa code received by the user. This is required for users with 2fa enabled. Making a POST request to login without a code will trigger a 2fa message to be sent to the user's phone. A secondary request can then be made with the correct code.
+                  pattern: "^[0–9]{6}"
+      responses:
+        "200":
+          description: The user's id, access token, and refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+  /auth/register:
+    post:
+      security: []
+      summary: Register a new user
+      description: Register a user with an email/phone number, name, and password. Signs this user in after registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+                - name
+              properties:
+                email:
+                  $ref: "#/components/schemas/Email"
+                phone:
+                  $ref: "#/components/schemas/Phone"
+                password:
+                  $ref: "#/components/schemas/Password"
+                name:
+                  $ref: "#/components/schemas/Name"
+      responses:
+        "200":
+          description: The user's id, access token, and refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+  /auth/token:
+    post:
+      security: []
+      summary: Refresh access token
+      description: Generate new access and refresh tokens based on the provided ones.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - accessToken
+                - refreshToken
+              properties:
+                accessToken:
+                  $ref: "#/components/schemas/AccessToken"
+                refreshToken:
+                  $ref: "#/components/schemas/RefreshToken"
+      responses:
+        "200":
+          description: The user's id, access token, and refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+  /auth/forgot:
+    post:
+      security: []
+      summary: Send reset email
+      description: Send a password reset code to the provided email or phone number.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emailOrPhone
+              properties:
+                emailOrPhone:
+                  $ref: "#/components/schemas/EmailOrPhone"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /auth/reset:
+    post:
+      security: []
+      summary: Reset password
+      description: Reset the password or user with the given email or phone using the code they received. Also, log them in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emailOrPhone
+                - password
+                - code
+              properties:
+                emailOrPhone:
+                  $ref: "#/components/schemas/EmailOrPhone"
+                password:
+                  $ref: "#/components/schemas/Password"
+                code:
+                  $ref: "#/components/schemas/AuthCode"
+      responses:
+        "200":
+          description: The user's id, access token, and refresh token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Tokens"
+  /profile:
+    get:
+      summary: Get current user's profile
+      description: Get the full profile for the currently logged-in user
+      responses:
+        "200":
+          description: The user's full profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FullProfile"
+    patch:
+      summary: Update current user's profile
+      description: Update the currently logged-in user's profile. Updatable fields include name, email, phone, and password. Updating email or phone will unverify any verified email address or phone number.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  $ref: "#/components/schemas/Name"
+                email:
+                  $ref: "#/components/schemas/Email"
+                phone:
+                  $ref: "#/components/schemas/Phone"
+                password:
+                  $ref: "#/components/schemas/Password"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    delete:
+      summary: Delete current user
+      description: "Delete the currently logged-in user's profile. WARNING: this will delete all user data as well as Locations, Items, Shopping Lists owned by this user. Use with caution."
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/photo:
+    put:
+      summary: Update profile image
+      description: Update the profile image for the currently logged-in user.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    delete:
+      summary: Delete profile image
+      description: Delete the profile image for the currently logged-in user.
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/verify/email/send:
+    post:
+      summary: Send a verification email
+      description: Send a verification email to the currently logged-in user
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/verify/email:
+    post:
+      summary: Verify current user's email
+      description: Verify the currently logged-in user's email address using the code they received.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  $ref: "#/components/schemas/AuthCode"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/verify/phone/send:
+    post:
+      summary: Send a verification text
+      description: Send a verification text to the currently logged-in user
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/verify/phone:
+    post:
+      summary: Verify current user's phone number
+      description: Verify the currently logged-in user's phone number using the code they received.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              properties:
+                code:
+                  $ref: "#/components/schemas/AuthCode"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/mfa/enable:
+    post:
+      summary: Enable multi-factor authentication
+      description: Enables multi-factor authentication for the currently logged-in user. The user must have a verified phone number.
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /profile/mfa/disable:
+    post:
+      summary: Disable multi-factor authentication
+      description: Disables multi-factor authentication for the currently logged-in user.
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /users/{id}/profile:
+    get:
+      summary: Get a user's public profile
+      description: Get a user's public profile. Public information includes a user's id, name, photo, number of mutual Locations, how many Locations this user owns as well as how many they are a member of. It also includes the number Items they own across all Locations
+      parameters:
+        - in: path
+          name: id
+          required: true
+          description: The user's id.
+          schema:
+            $ref: "#/components/schemas/ObjectID"
+      responses:
+        "200":
+          description: The user's public profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    $ref: "#/components/schemas/ObjectID"
+                  name:
+                    $ref: "#/components/schemas/Name"
+                  photoUrl:
+                    $ref: "#/components/schemas/PhotoUrl"
+                  ownedLocations:
+                    description: The number of Locations the user owns
+                    type: number
+                  memberLocations:
+                    description: The number of Locations the user is a member of.
+                    type: number
+                  totalItems:
+                    description: The number of Items this user owns.
+                    type: number
+                  mutualLocations:
+                    description: The number of Locations the user shares with the requesting user.
+                    type: number
+  /upc/{upc}:
+    get:
+      summary: Get Item from UPC
+      description: Get Item information from a UPC barcode. Returns item name and brand
+      parameters:
+        - in: path
+          name: upc
+          schema:
+            type: string
+          required: true
+      responses:
+        "200":
+          description: The Item information, if found.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  name:
+                    type: string
+                    description: The name (and brand) of the Item
+                    example: Hood Whole Milk
+  /locations:
+    post:
+      summary: Create a Location
+      description: Create a new Location for the requesting user. Users with free accounts can create up to one Location (either a fridge or a pantry). Users with premium accounts can create unlimited Locations
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationCreateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    get:
+      summary: Get all Locations
+      description: Get a list of all the Locations the current user has access to. Users with a free account can view Locations that they own and the one shared Location they are allowed to join. Premium users can view Locations that they own or are a member of. Locations can be searched by name and filtered by owner/member.
+      parameters:
+        - in: query
+          name: q
+          description: Search term for searching Location by name
+          schema:
+            type: string
+        - in: query
+          name: sort
+          description: Field to sort Locations by
+          schema:
+            type: string
+            default: lastOpened
+            enum:
+              - name
+              - createdAt
+              - updatedAt
+              - lastOpened
+        - $ref: "#/components/parameters/OwnerQuery"
+        - $ref: "#/components/parameters/MemberQuery"
+        - $ref: "#/components/parameters/OrderQuery"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: A list of Locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LocationBasic"
+  /locations/{id}:
+    get:
+      summary: Get a Location by ID
+      description: Get a Location by ID. Will only return a Location if a user is authorized to see it. Users with a free account can view Locations that they own and the one shared Location they are allowed to join. Premium users can view Locations that they own or are a member of.
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+      responses:
+        "200":
+          description: The requested Location object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationBasicValue"
+    patch:
+      summary: Update a Location
+      description: Update the Location with the given ID. Updatable fields include name, iconName, lastUpdated, notes, and notificationDays. Users with free accounts can update their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can update Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationUpdateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    delete:
+      summary: Delete a Location
+      description: Delete a Location by ID. Users can delete Locations that they own, regardless of subscription status.
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /locations/{id}/join:
+    post:
+      summary: Join a Location
+      description: Add the requesting user as a member of the Location with the given ID. Free users can join up to one Location owned by a premium user, and premium users can join unlimited Locations owned by premium users. If a free user does not have a default shared location but is a member of another location from when they had a previous subscription, rejoining that location will set that location as their default shared location.
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /locations/{id}/leave:
+    post:
+      summary: Leave a Location
+      description: Remove the requesting member as a member of the Location with the given ID. Free users can remove themselves from their default shared Location, and premium users can remove themselves from any Location they are a member of.
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /locations/{id}/members/{memberId}:
+    delete:
+      summary: Remove a member from a Location
+      description: Remove the member with the given ID from the Location with the given ID. Free users can remove members from their default shared Location, given that the owner has an active subscription. Premium users can remove members from Locations which they own or are a member of, provided that the owner has an active subscription.
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+        - in: path
+          name: memberId
+          required: true
+          description: The ID of the member to remove
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /locations/{id}/items:
+    post:
+      summary: Add an Item to a Location
+      description: Add an Item to the Location with the given ID. Free users can add Items to their default owned Location or their default shared Location, provided that the owner has an active subscription. Premium users can add Items to Locations which they own or are a member or, provided that the owner has an active subscription.
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemCreateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    get:
+      summary: Get Items in a Location
+      description: Get a list of all of the Items in the given Location. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of Items can be searched by name. Items can be filtered by owner.
+      parameters:
+        - $ref: "#/components/parameters/OwnerQuery"
+        - $ref: "#/components/parameters/LocationIdParam"
+        - in: query
+          name: q
+          description: Search term for searching Items by name
+          schema:
+            type: string
+        - in: query
+          name: sort
+          description: Field to sort Items by
+          schema:
+            type: string
+            default: name
+            enum:
+              - name
+              - category
+              - added
+              - expirationDate
+              - opened
+              - purchaseLocation
+              - price
+        - $ref: "#/components/parameters/OrderQuery"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: A list of Items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Item"
+  /locations/{id}/items/{itemId}:
+    get:
+      summary: Get an Item
+      description: Get the Item with the given ID from the Location with the given ID. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of. Items can be searched by name
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+        - $ref: "#/components/parameters/ItemIdParam"
+      responses:
+        "200":
+          description: The requested Item object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ItemWithLocation"
+    patch:
+      summary: Update an Item
+      description: Update the Item with the given ID in the Location with the given ID. Updatable fields include name, category, iconName, added, expirationDate, opened, purchaseLocation, notes, price. Users with free accounts can update Items in their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can update Items in Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+        - $ref: "#/components/parameters/ItemIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ItemUpdateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    delete:
+      summary: Delete an Item
+      description: Delete the Item with the given ID from the Location with the given ID. Users with free accounts can delete Items in their default personal Location and their default shared Location, as long as the owner of the shared Location has an active subscription. Premium users can delete Items in Locations that they own or that they are a member of, provided that the owner of the Location has an active subscription
+      parameters:
+        - $ref: "#/components/parameters/LocationIdParam"
+        - $ref: "#/components/parameters/ItemIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /locations/items/search:
+    get:
+      summary: Search all Items
+      description: Search all Items in all Locations a user has access to. Users with a free account can view Items in Locations that they own and the one shared Location they are allowed to join. Premium users can view Items in Locations that they own or are a member of. Items can be searched by name.
+      parameters:
+        - in: query
+          name: q
+          description: Search term for searching Items by name
+          schema:
+            type: string
+        - in: query
+          name: sort
+          description: Field to sort Items by
+          schema:
+            type: string
+            default: name
+            enum:
+              - name
+              - category
+              - added
+              - expirationDate
+              - opened
+              - purchaseLocation
+              - price
+        - $ref: "#/components/parameters/OrderQuery"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: The found Item objects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ItemWithLocation"
+  /lists:
+    post:
+      summary: Create a Shopping List
+      description: Create a new Shopping List for the requesting user. Users with free accounts can create up to one Shopping List at a time. Premium users can create unlimited Shopping Lists.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListCreateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    get:
+      summary: Get all Shopping Lists
+      description: Get a list of all Shopping Lists. Free users can view Shopping Lists which they own. Premium users can view Shopping Lists which they own or are a member of. Lists are sorted by last updated time. Lists can be filtered by owner or member.
+      parameters:
+        - $ref: "#/components/parameters/OwnerQuery"
+        - $ref: "#/components/parameters/MemberQuery"
+        - in: query
+          name: sort
+          description: Field to sort Shopping Lists by
+          schema:
+            type: string
+            default: updatedAt
+            enum:
+              - name
+              - createdAt
+              - updatedAt
+        - $ref: "#/components/parameters/OrderQuery"
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/OffsetQuery"
+      responses:
+        "200":
+          description: A list of Shopping Lists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ShoppingListBasic"
+  /lists/{id}:
+    get:
+      summary: Get a Shopping List by ID
+      description: Get a Shopping List by ID. Will only return a Shopping List if a user is authorized to view it. Free users can view Shopping Lists which they own. Premium users can view Shopping Lists which they own or are a member of.
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+      responses:
+        "200":
+          description: The requested Shopping List object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShoppingList"
+    patch:
+      summary: Update a Shopping List
+      description: Update the Shopping List with the given ID. Updatable fields include name and notes. Users with free accounts can update their default Shopping List. Premium users can update Shopping Lists which they own or are a member of, provided that the owner has an active subscription.
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListUpdateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    delete:
+      summary: Delete a Shopping List
+      description: Delete a Shopping List. Users can delete Shopping Lists which they own, regardless of subscription status.
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /lists/{id}/join:
+    post:
+      summary: Join a Shopping List
+      description: Add the requesting user as a member of the Shopping List with the given ID. Only Premium users can join Shopping Lists, and the owner of the Shopping List must have an active subscription.
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /lists/{id}/leave:
+    post:
+      summary: Leave a Shopping List
+      description: Remove the requesting member as a member of the Shopping List with the given ID. Premium users can leave Shopping Lists which they are a member of
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /lists/{id}/members/{memberId}:
+    delete:
+      summary: Remove a member from a Shopping List
+      description: Remove the member with the given ID from the Shopping List with the given ID. Premium users can remove members from Shopping Lists which they own or are a member of, provided that the owner has an active subscription.
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+        - in: path
+          name: memberId
+          required: true
+          description: The ID of the member to remove
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /lists/{id}/items:
+    post:
+      summary: Add an Item to a Shopping List
+      description: Add an Item to the Shopping List with the given ID. Free users can add Items to their default Shopping List. Premium users can add Items to Shopping Lists which they own or are a member or, provided that the owner has an active subscription.
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListItemCreateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+  /lists/{id}/items/{itemId}:
+    patch:
+      summary: Update an Item in a Shopping List
+      description: Update the Item with the given ID in the Shopping List with the given ID. Updatable fields include name, notes, and checked. Users with free accounts can update Items in their default Shopping List. Premium users can update Items in Shopping Lists that they own or that they are a member of, provided that the owner of the Location has an active subscription
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+        - $ref: "#/components/parameters/ListItemIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListItemUpdateBody"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+    delete:
+      summary: Delete an Item from a Shopping List
+      description: Delete the Item with the given ID from the Shopping List with the given ID. Users with free accounts can update Items in their default Shopping List. Premium users can update Items in Shopping Lists that they own or that they are a member of, provided that the owner of the Location has an active subscription
+      parameters:
+        - $ref: "#/components/parameters/ListIdParam"
+        - $ref: "#/components/parameters/ListItemIdParam"
+      responses:
+        "200":
+          $ref: "#/components/responses/SuccessResponse"
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    EmailOrPhone:
+      type: string
+      description: The user's email or phone number.
+      example: email@website.com
+    Password:
+      type: string
+      description: The user's password.
+      example: Password*123
+    Name:
+      type: string
+      description: The user's name or username
+      example: jjfino
+    PhotoUrl:
+      type: string
+      description: The url to the User's profile photo
+      example: www.google.com
+    Email:
+      type: string
+      description: The user's email address
+      example: email@website.com
+    Phone:
+      type: string
+      description: The user's phone number with country code.
+      example: "+112345678910"
+    EmailVerified:
+      type: boolean
+      description: Whether the user's email has been verified
+    PhoneVerified:
+      type: boolean
+      description: Whether the user's phone number has been verified
+    SubscriptionExpires:
+      type: string
+      format: date-time
+      description: When this user's subscription expires, if applicable
+    DefaultLocation:
+      description: The id of the user's default personal Location
+      $ref: "#/components/schemas/ObjectID"
+    DefaultSharedLocation:
+      description: The id of the user's default shared Location
+      $ref: "#/components/schemas/ObjectID"
+    DefaultShoppingList:
+      description: The id of the user's default Shopping List
+      $ref: "#/components/schemas/ObjectID"
+    MFAEnabled:
+      description: Whether the user has enabled multi/2-factor authentication
+      type: boolean
+    IsSubscribed:
+      type: boolean
+      description: Whether this user's subscription is active at the time of retrieval
+    Tokens:
+      type: object
+      required:
+        - id
+        - accessToken
+        - refreshToken
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        accessToken:
+          $ref: "#/components/schemas/AccessToken"
+        refreshToken:
+          $ref: "#/components/schemas/RefreshToken"
+    AccessToken:
+      type: string
+      description: The user's access JWT. Expires after 1 hour.
+      pattern: (^[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*$)
+    RefreshToken:
+      type: string
+      description: The user's refresh JWT. Expires after 7 days.
+      pattern: (^[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*\.[A-Za-z0-9-_]*$)
+    AuthCode:
+      type: string
+      description: A 6 digit authentication code.
+      pattern: "[0–9]{6}"
+    FullProfile:
+      type: object
+      required:
+        - name
+        - mfaEnabled
+      properties:
+        name:
+          $ref: "#/components/schemas/Name"
+        photoUrl:
+          $ref: "#/components/schemas/PhotoUrl"
+        email:
+          $ref: "#/components/schemas/Email"
+        emailVerified:
+          $ref: "#/components/schemas/EmailVerified"
+        phone:
+          $ref: "#/components/schemas/Phone"
+        phoneVerified:
+          $ref: "#/components/schemas/Name"
+        subscriptionExpires:
+          $ref: "#/components/schemas/SubscriptionExpires"
+        defaultLocation:
+          $ref: "#/components/schemas/DefaultLocation"
+        defaultSharedLocation:
+          $ref: "#/components/schemas/DefaultSharedLocation"
+        defautShoppingList:
+          $ref: "#/components/schemas/DefaultShoppingList"
+        mfaEnabled:
+          $ref: "#/components/schemas/MFAEnabled"
+    LocationBasic:
+      type: object
+      required:
+        - id
+        - name
+        - iconName
+        - owner
+        - notificationDays
+        - lastOpened
+        - items
+        - members
+        - lastUpdatedBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        name:
+          $ref: "#/components/schemas/LocationName"
+        iconName:
+          $ref: "#/components/schemas/LocationIconName"
+        owner:
+          $ref: "#/components/schemas/BaseUserWithExpiry"
+        members:
+          type: array
+          description: A list of members of the Location
+          items:
+            $ref: "#/components/schemas/BaseUser"
+        notificationDays:
+          $ref: "#/components/schemas/LocationNotificationDays"
+        items:
+          type: integer
+          description: The number of Items in the Location
+        notes:
+          $ref: "#/components/schemas/LocationNotes"
+        lastOpened:
+          $ref: "#/components/schemas/LocationLastOpened"
+        lastUpdatedBy:
+          $ref: "#/components/schemas/BaseUser"
+        createdAt:
+          $ref: "#/components/schemas/CreatedAt"
+        updatedAt:
+          $ref: "#/components/schemas/UpdatedAt"
+    LocationBasicValue:
+      type: object
+      required:
+        - id
+        - name
+        - iconName
+        - owner
+        - notificationDays
+        - lastOpened
+        - items
+        - members
+        - totalValue
+        - lastUpdatedBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        name:
+          $ref: "#/components/schemas/LocationName"
+        iconName:
+          $ref: "#/components/schemas/LocationIconName"
+        owner:
+          $ref: "#/components/schemas/BaseUserWithExpiry"
+        members:
+          type: array
+          description: A list of members of the Location
+          items:
+            $ref: "#/components/schemas/BaseUser"
+        notificationDays:
+          $ref: "#/components/schemas/LocationNotificationDays"
+        items:
+          type: integer
+          description: The number of Items in the Location
+        totalValue:
+          type: number
+          description: The total value of the Items in this Location
+          example: 101.99
+        notes:
+          $ref: "#/components/schemas/LocationNotes"
+        lastOpened:
+          $ref: "#/components/schemas/LocationLastOpened"
+        lastUpdatedBy:
+          $ref: "#/components/schemas/BaseUser"
+        createdAt:
+          $ref: "#/components/schemas/CreatedAt"
+        updatedAt:
+          $ref: "#/components/schemas/UpdatedAt"
+    LocationCreateBody:
+      type: object
+      required:
+        - name
+        - iconName
+      properties:
+        name:
+          $ref: "#/components/schemas/LocationName"
+        iconName:
+          $ref: "#/components/schemas/LocationIconName"
+        notes:
+          $ref: "#/components/schemas/LocationNotes"
+    LocationUpdateBody:
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/LocationName"
+        iconName:
+          $ref: "#/components/schemas/LocationIconName"
+        notificationDays:
+          $ref: "#/components/schemas/LocationNotificationDays"
+        notes:
+          $ref: "#/components/schemas/LocationNotes"
+        lastOpened:
+          $ref: "#/components/schemas/LocationLastOpened"
+    Item:
+      type: object
+      required:
+        - id
+        - name
+        - category
+        - iconName
+        - owner
+        - added
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        name:
+          $ref: "#/components/schemas/ItemName"
+        category:
+          $ref: "#/components/schemas/ItemCategory"
+        iconName:
+          $ref: "#/components/schemas/ItemIconName"
+        owner:
+          $ref: "#/components/schemas/BaseUser"
+        added:
+          $ref: "#/components/schemas/ItemAdded"
+        expirationDate:
+          $ref: "#/components/schemas/ItemExpirationDate"
+        opened:
+          $ref: "#/components/schemas/ItemOpened"
+        purchaseLocation:
+          $ref: "#/components/schemas/ItemPurchaseLocation"
+        notes:
+          $ref: "#/components/schemas/ItemNotes"
+        price:
+          $ref: "#/components/schemas/ItemPrice"
+    ItemWithLocation:
+      type: object
+      required:
+        - id
+        - name
+        - category
+        - iconName
+        - owner
+        - added
+        - location
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        name:
+          $ref: "#/components/schemas/ItemName"
+        category:
+          $ref: "#/components/schemas/ItemCategory"
+        iconName:
+          $ref: "#/components/schemas/ItemIconName"
+        owner:
+          $ref: "#/components/schemas/BaseUser"
+        added:
+          $ref: "#/components/schemas/ItemAdded"
+        expirationDate:
+          $ref: "#/components/schemas/ItemExpirationDate"
+        opened:
+          $ref: "#/components/schemas/ItemOpened"
+        purchaseLocation:
+          $ref: "#/components/schemas/ItemPurchaseLocation"
+        notes:
+          $ref: "#/components/schemas/ItemNotes"
+        price:
+          $ref: "#/components/schemas/ItemPrice"
+        location:
+          type: object
+          description: Location information for the Item
+          properties:
+            id:
+              $ref: "#/components/schemas/ObjectID"
+            name:
+              $ref: "#/components/schemas/LocationName"
+    ItemCreateBody:
+      type: object
+      required:
+        - name
+        - category
+        - iconName
+      properties:
+        name:
+          $ref: "#/components/schemas/ItemName"
+        category:
+          $ref: "#/components/schemas/ItemCategory"
+        iconName:
+          $ref: "#/components/schemas/ItemIconName"
+        added:
+          $ref: "#/components/schemas/ItemAdded"
+        expirationDate:
+          $ref: "#/components/schemas/ItemExpirationDate"
+        opened:
+          $ref: "#/components/schemas/ItemOpened"
+        purchaseLocation:
+          $ref: "#/components/schemas/ItemPurchaseLocation"
+        notes:
+          $ref: "#/components/schemas/ItemNotes"
+        price:
+          $ref: "#/components/schemas/ItemPrice"
+    ItemUpdateBody:
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/ItemName"
+        category:
+          $ref: "#/components/schemas/ItemCategory"
+        iconName:
+          $ref: "#/components/schemas/ItemIconName"
+        added:
+          $ref: "#/components/schemas/ItemAdded"
+        expirationDate:
+          $ref: "#/components/schemas/ItemExpirationDate"
+        opened:
+          $ref: "#/components/schemas/ItemOpened"
+        purchaseLocation:
+          $ref: "#/components/schemas/ItemPurchaseLocation"
+        notes:
+          $ref: "#/components/schemas/ItemNotes"
+        price:
+          $ref: "#/components/schemas/ItemPrice"
+    ShoppingList:
+      type: object
+      required:
+        - name
+        - owner
+        - items
+        - members
+        - lastUpdatedBy
+      properties:
+        name:
+          $ref: "#/components/schemas/ListName"
+        notes:
+          $ref: "#/components/schemas/ListNotes"
+        owner:
+          $ref: "#/components/schemas/BaseUserWithExpiry"
+        members:
+          type: array
+          description: The members of the Shopping List
+          items:
+            $ref: "#/components/schemas/BaseUser"
+        items:
+          type: array
+          description: The items in the Shopping List
+          items:
+            $ref: "#/components/schemas/ListItem"
+        lastUpdatedBy:
+          $ref: "#/components/schemas/BaseUser"
+    ShoppingListBasic:
+      type: object
+      required:
+        - name
+        - owner
+        - items
+        - members
+        - lastUpdatedBy
+      properties:
+        name:
+          $ref: "#/components/schemas/ListName"
+        notes:
+          $ref: "#/components/schemas/ListNotes"
+        owner:
+          $ref: "#/components/schemas/BaseUserWithExpiry"
+        members:
+          type: array
+          description: The members of the Shopping List
+          items:
+            $ref: "#/components/schemas/BaseUser"
+        items:
+          type: integer
+          description: The number of items in the Shopping List
+        lastUpdatedBy:
+          $ref: "#/components/schemas/BaseUser"
+    ListCreateBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          $ref: "#/components/schemas/ListItemName"
+        notes:
+          $ref: "#/components/schemas/ListItemNotes"
+    ListUpdateBody:
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/ListItemName"
+        notes:
+          $ref: "#/components/schemas/ListItemNotes"
+        newOrder:
+          description: The new order of Items in the Shopping List
+          type: array
+          items:
+            $ref: "#/components/schemas/ListItemOrder"
+    ListItem:
+      type: object
+      required:
+        - name
+        - checked
+      properties:
+        name:
+          $ref: "#/components/schemas/ListItemName"
+        notes:
+          $ref: "#/components/schemas/ListItemNotes"
+        checked:
+          $ref: "#/components/schemas/ListItemChecked"
+        pos:
+          $ref: "#/components/schemas/ListItemOrder"
+    ListItemCreateBody:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          $ref: "#/components/schemas/ListItemName"
+        notes:
+          $ref: "#/components/schemas/ListItemNotes"
+        checked:
+          $ref: "#/components/schemas/ListItemChecked"
+    ListItemUpdateBody:
+      type: object
+      properties:
+        name:
+          $ref: "#/components/schemas/ListItemName"
+        notes:
+          $ref: "#/components/schemas/ListItemNotes"
+        checked:
+          $ref: "#/components/schemas/ListItemChecked"
+    ObjectID:
+      type: string
+      pattern: ^[a-z0-9]{24}$
+      description: The object's ID
+    LocationName:
+      type: string
+      description: The Location's name
+      example: Julia's Fridge
+      maxLength: 100
+    LocationIconName:
+      type: string
+      description: The Location's display icon name
+      example: fridge
+      maxLength: 100
+    LocationNotificationDays:
+      type: array
+      description: How many days before items' expiration dates the requesting user should be notified.
+      items:
+        type: integer
+        minimum: 0
+        maximum: 30
+    LocationLastOpened:
+      type: string
+      format: date-time
+      description: When this Location was last accessed by the requesting user
+    LocationNotes:
+      type: string
+      description: Any notes about the Location
+      example: Fridge in the Kitchen
+      maxLength: 300
+    ItemName:
+      type: string
+      description: The name of the Item
+      example: Whole Milk
+      maxLength: 100
+    ItemCategory:
+      type: string
+      description: The category of the Item
+      example: grocery
+      maxLength: 100
+    ItemIconName:
+      type: string
+      description: The display icon name for the Item
+      example: grocery
+      maxLength: 100
+    ItemExpirationDate:
+      type: string
+      format: date-time
+      description: When the Item expires
+    ItemAdded:
+      type: string
+      format: date-time
+      description: When the Item was added to the Location
+    ItemOpened:
+      type: string
+      format: date-time
+      description: When the Item was opened
+    ItemPurchaseLocation:
+      type: string
+      description: Where the Item was purchased
+      example: Whole Foods
+      maxLength: 100
+    ItemPrice:
+      type: number
+      description: The price of the Item
+      example: 5.99
+    ItemNotes:
+      type: string
+      description: Any notes about the Item
+      example: Our favorite pizza!
+      maxLength: 300
+    ListName:
+      type: string
+      description: The name of the Shopping List
+      example: Whole Foods Shopping List
+      maxLength: 100
+    ListNotes:
+      type: string
+      description: Any notes about the Shopping List
+      example: List for this weekend
+      maxLength: 300
+    ListItemName:
+      type: string
+      description: The name of the item
+      example: Eggs
+      maxLength: 100
+    ListItemNotes:
+      type: string
+      description: Any notes about the item
+      example: 2% milk
+      maxLength: 300
+    ListItemChecked:
+      type: boolean
+      description: Whether this item is checked off in the list
+    ListItemOrder:
+      type: integer
+      description: The order of this Item in the Shopping List
+      minimum: 0
+    CreatedAt:
+      type: string
+      description: When this object was created
+      format: date-time
+    UpdatedAt:
+      type: string
+      description: When this object was last updated
+      format: date-time
+    BaseUser:
+      type: object
+      required:
+        - id
+        - name
+        - photoUrl
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        name:
+          $ref: "#/components/schemas/Name"
+        photoUrl:
+          $ref: "#/components/schemas/PhotoUrl"
+    BaseUserWithExpiry:
+      type: object
+      required:
+        - id
+        - name
+        - photoUrl
+      properties:
+        id:
+          $ref: "#/components/schemas/ObjectID"
+        name:
+          $ref: "#/components/schemas/Name"
+        photoUrl:
+          $ref: "#/components/schemas/PhotoUrl"
+        isSubscribed:
+          $ref: "#/components/schemas/IsSubscribed"
+  parameters:
+    OwnerQuery:
+      in: query
+      name: owner
+      description: The id of the owner of this resource
+      schema:
+        $ref: "#/components/schemas/ObjectID"
+    MemberQuery:
+      in: query
+      name: member
+      description: The id of the member of this resource
+      schema:
+        $ref: "#/components/schemas/ObjectID"
+    LimitQuery:
+      in: query
+      name: limit
+      required: false
+      description: The maximum number of results to return
+      schema:
+        type: integer
+        default: 30
+        minimum: 0
+        maximum: 50
+    EmailOrPhone:
+      in: path
+      name: emailOrPhone
+      required: true
+      description: The email or phone number to send the reset code to.
+      schema:
+        type: string
+        example: email@website.com
+    OffsetQuery:
+      in: query
+      name: offset
+      required: false
+      description: Offset of results to return
+      schema:
+        type: integer
+        default: "0"
+        minimum: 0
+    OrderQuery:
+      in: query
+      name: order
+      required: false
+      description: Whether to sort in descending order
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: asc
+    LocationIdParam:
+      in: path
+      name: id
+      required: true
+      description: The ID of the Location
+      schema:
+        $ref: "#/components/schemas/ObjectID"
+    ItemIdParam:
+      in: path
+      name: itemId
+      required: true
+      description: The ID of the Item
+      schema:
+        $ref: "#/components/schemas/ObjectID"
+    ListIdParam:
+      in: path
+      name: id
+      required: true
+      description: The ID of the Shopping List
+      schema:
+        $ref: "#/components/schemas/ObjectID"
+    ListItemIdParam:
+      in: path
+      name: itemId
+      required: true
+      description: The ID of item in the Shopping List
+      schema:
+        $ref: "#/components/schemas/ObjectID"
+  responses:
+    SuccessResponse:
+      description: A success message
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - message
+            properties:
+              message:
+                description: A success message
+                type: string
+                example: Update successful

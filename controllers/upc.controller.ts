@@ -1,3 +1,4 @@
+import { Joi } from "express-validation";
 import nameFromUPC from "../edamam/nameFromUPC";
 import { authorizeAndCatchAsync, catchAsync } from "../error/catchAsync";
 import LocationModel from "../schema/location.schema";

@@ -22,9 +22,9 @@ const router = express.Router();
 router.get("/", profile.getProfile);
 
 /**
- * PUT /api/v1/profile
+ * PATCH /api/v1/profile
  */
-router.put("/", profile.updateProfile);
+router.patch("/", profile.updateProfile);
 
 /**
  * DELETE /api/v1/profile
@@ -32,7 +32,7 @@ router.put("/", profile.updateProfile);
 router.delete("/", profile.deleteProfile);
 
 /**
- * POST /api/v1/profile/photo
+ * PUT /api/v1/profile/photo
  */
 router.put("/photo", upload.single("image"), profile.addPhoto);
 

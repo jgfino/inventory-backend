@@ -13,9 +13,15 @@ import LocationModel from "../schema/location.schema";
 export const getUserProfile = authorizeAndCatchAsync(
   async (req, res, next, locationModel) => {
     const userId = req.params.id;
-    const id = req.user._id.toString();
 
-    const profile = await UserModel.aggregate([
+    const mutualLocationsQuery = locationModel.find({
+      or: [{ owner: userId }, { members: userId }],
+    });
+    mutualLocationsQuery.projection({ _id: 1 });
+
+    const mutualLocations = await mutualLocationsQuery;
+
+    let profiles: any[] = await UserModel.aggregate([
       {
         $match: { _id: new Types.ObjectId(userId) },
       },
@@ -40,29 +46,32 @@ export const getUserProfile = authorizeAndCatchAsync(
           locations: {
             $concatArrays: ["$ownedLocations", "$memberLocations"],
           },
-          mutualLocations: {
-            $filter: {
-              input: "$locations",
-              as: "out",
-              cond: locationModel.getFilter(),
-            },
-          },
         },
       },
       {
         $project: {
           id: "$_id",
+          _id: 0,
           name: 1,
           photoUrl: 1,
 
           ownedLocations: { $sum: "$ownedLocations" },
           memberLocations: { $sum: "$memberLocations" },
           totalItems: { $sum: "$locations.items" },
-
-          mutualLocations: { $sum: "$mutualLocations" },
         },
       },
     ]);
+
+    if (profiles.length <= 0) {
+      return next(
+        DatabaseErrors.NOT_FOUND(
+          "A profile for a user with this id was not found"
+        )
+      );
+    }
+
+    const profile = profiles[0];
+    profile.mutualLocations = mutualLocations.length;
 
     res.status(200).send(profile);
   },

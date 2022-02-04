@@ -6,6 +6,7 @@ import { sendSMS } from "../twilio/sms";
 import { VerifyPhoneTemplate } from "../twilio/templates.twilio";
 import AuthErrors from "../error/errors/auth.errors";
 import aws from "aws-sdk";
+import { Joi } from "express-validation";
 
 /**
  * Get the full profile for the currently logged-in user
@@ -61,6 +62,7 @@ export const deleteProfile = catchAsync(async (req, res, next) => {
   res.status(200).send({ message: "User deleted successfully" });
 });
 
+// Initialize s3
 const s3 = new aws.S3({
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
@@ -141,7 +143,7 @@ export const sendVerificationEmail = catchAsync(async (req, res, next) => {
  */
 export const verifyEmail = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
-  const code = req.query.code as string;
+  const code = req.body.code;
 
   if (!user || !user.email) {
     return next(AuthErrors.NO_EMAIL);
@@ -177,7 +179,7 @@ export const sendTextVerificationCode = catchAsync(async (req, res, next) => {
  */
 export const verifyPhone = catchAsync(async (req, res, next) => {
   const user = await UserModel.findById(req.user._id);
-  const code = (req.query.code as string) ?? "";
+  const code = req.body.code;
 
   if (!user || !user.phone) {
     return next(AuthErrors.NO_PHONE);
