@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 import { HydratedDocument, Model, model, Schema } from "mongoose";
 import { BaseUserWithExpiry, User } from "../types/User";
 import bcrypt from "bcryptjs";
@@ -221,7 +219,7 @@ const UserSchema = new Schema<User, UserModel, UserInstanceMethods>(
 //#region Middleware
 
 // Hash password before saving. Update user fields in other documents
-UserSchema.pre("save", async function (next) {
+UserSchema.pre("save", async function (this: HydratedDocument<User>, next) {
   if (this.isModified("password")) {
     const hash = bcrypt.hashSync(this.password, 10);
     this.password = hash;
@@ -308,7 +306,7 @@ UserSchema.pre("save", async function (next) {
 });
 
 // Make sure the user always has a unique email or phone number
-UserSchema.pre("validate", async function (next) {
+UserSchema.pre("validate", async function (this: HydratedDocument<User>, next) {
   if (!this.email && !this.phone) {
     return next(
       DatabaseErrors.INVALID_FIELD(
@@ -356,7 +354,7 @@ UserSchema.pre("validate", async function (next) {
 });
 
 // Handle effects of deleting a user
-UserSchema.pre("remove", async function (next) {
+UserSchema.pre("remove", async function (this: HydratedDocument<User>, next) {
   // The operations to execute
   const promises: Promise<any>[] = [];
 
@@ -405,8 +403,9 @@ UserSchema.pre("remove", async function (next) {
     "items.owner._id": this._id,
   });
   promises.push(
-    listsWithItems.map(async (list) => {
+    ...listsWithItems.map(async (list) => {
       // Remove items owned by this user
+      // @ts-ignore
       list.items = list.items.filter(
         (item) => item.owner._id.toString() != this._id.toString()
       );

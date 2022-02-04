@@ -7,6 +7,7 @@ import { BaseUser } from "../types/User";
 import { Types } from "mongoose";
 import { paginateNestedArrayPipeline, parsePaginationQuery } from "./utils";
 import { Item } from "../types/Location";
+import { Joi } from "express-validation";
 
 /**
  * Create a new Location for the requesting user. Users with free accounts can
@@ -18,27 +19,13 @@ export const createLocation = catchAsync(async (req, res, next) => {
   const { name, iconName, notes } = req.body;
 
   // Restrictions apply if the user is not premium
-  if (!isPremium) {
+  if (!isPremium && req.user.defaultLocation) {
     // They cannot create a second Location
-    if (req.user.defaultLocation) {
-      return next(
-        AuthErrors.PREMIUM_FEATURE(
-          "A paid account is required to create more than one Location"
-        )
-      );
-    }
-
-    // They can only create "fridge" or "pantry" Locations
-    if (
-      iconName.toLowerCase() != "fridge" &&
-      iconName.toLowerCase() != "pantry"
-    ) {
-      return next(
-        AuthErrors.PREMIUM_FEATURE(
-          "Only Pantry and Fridge Locations can be created with a free account"
-        )
-      );
-    }
+    return next(
+      AuthErrors.PREMIUM_FEATURE(
+        "A paid account is required to create more than one Location"
+      )
+    );
   }
 
   // Create the new Location
@@ -273,14 +260,14 @@ export const updateLocation = authorizeAndCatchAsync(
         return next(error);
       }
 
-      newData.lastOpened.$.days = lastOpened;
-      filter.lastOpened.user = req.user._id;
+      newData["lastOpened.$.date"] = lastOpened;
+      filter["lastOpened.user"] = req.user._id;
     } else if (notificationDays != null) {
-      newData.notificationDays.$.days = notificationDays;
-      filter.notificationDays.user = req.user._id;
+      newData["notificationDays.$.days"] = notificationDays;
+      filter["notificationDays.user"] = req.user._id;
     } else if (lastOpened) {
-      newData.lastOpened.$.days = lastOpened;
-      filter.lastOpened.user = req.user._id;
+      newData["lastOpened.$.date"] = lastOpened;
+      filter["lastOpened.user"] = req.user._id;
     }
 
     const updateResult = await locationModel.updateOne(filter, newData, {

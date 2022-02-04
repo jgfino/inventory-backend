@@ -8,21 +8,16 @@ import {
   ForgotPasswordTextTemplate,
   MFATemplate,
 } from "../twilio/templates.twilio";
-import DatabaseErrors from "../error/errors/database.errors";
 import AuthErrors from "../error/errors/auth.errors";
 
 /**
  * Login a user with an email/phone number and password.
  */
 export const login = catchAsync(async (req, res, next) => {
-  const emailOrPhone = req.body.emailOrPhone;
-  const password = req.body.password;
+  const body = req.body;
 
-  if (!emailOrPhone || !password) {
-    return next(
-      DatabaseErrors.INVALID_FIELD("Must provide an email and password")
-    );
-  }
+  const emailOrPhone: string = body.emailOrPhone;
+  const password: string = body.password;
 
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);
   if (!user) {
@@ -55,22 +50,14 @@ export const login = catchAsync(async (req, res, next) => {
  * user in after registration.
  */
 export const register = catchAsync(async (req, res, next) => {
-  const { emailOrPhone, name, password } = req.body;
+  const body = req.body;
 
-  const userData: any = {
-    name: name,
-    password: password,
+  const userData = {
+    name: body.name,
+    password: body.password,
+    email: body.email,
+    phone: body.phone,
   };
-
-  if (!emailOrPhone) {
-    return next(DatabaseErrors.INVALID_FIELD());
-  }
-
-  if (validator.isEmail(emailOrPhone)) {
-    userData.email = emailOrPhone;
-  } else if (validator.isMobilePhone(emailOrPhone)) {
-    userData.phone = emailOrPhone;
-  }
 
   const newUser = await UserModel.create(userData);
   const tokens = await newUser.generateTokens();
@@ -84,17 +71,10 @@ export const register = catchAsync(async (req, res, next) => {
  * Generate new access and refresh tokens based on the provided ones.
  */
 export const refreshToken = catchAsync(async (req, res, next) => {
-  if (!req.body.refreshToken) {
-    return next(DatabaseErrors.INVALID_FIELD("Must provide refresh token"));
-  }
-
-  if (!req.body.accessToken) {
-    return next(DatabaseErrors.INVALID_FIELD("Must provide access token"));
-  }
-
+  const body = req.body;
   const tokens = await UserModel.refreshTokens(
-    req.body.accessToken,
-    req.body.refreshToken
+    body.accessToken,
+    body.refreshToken
   );
 
   return res.status(200).json({
@@ -131,13 +111,11 @@ export const forgotPassword = catchAsync(async (req, res, next) => {
  * Reset a user's password. Returns new access/refresh tokens.
  */
 export const resetPassword = catchAsync(async (req, res, next) => {
-  if (!req.body.password) {
-    return next(DatabaseErrors.INVALID_FIELD("Must provide new password"));
-  }
+  const body = req.body;
 
-  const emailOrPhone = req.params.emailOrPhone;
-  const resetCode = req.query.code as string;
-  const password = req.body.password;
+  const emailOrPhone = body.emailOrPhone;
+  const resetCode = body.code as string;
+  const password = body.password;
 
   const user = await UserModel.findByEmailOrPhone(emailOrPhone);
 

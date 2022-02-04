@@ -19,9 +19,9 @@ router.get("/", locations.getLocations);
 router.get("/:id", locations.getLocation);
 
 /**
- * PUT /api/v1/locations/{id}
+ * PATCH /api/v1/locations/{id}
  */
-router.put("/:id", locations.updateLocation);
+router.patch("/:id", locations.updateLocation);
 
 /**
  * DELETE /api/v1/locations/{id}
@@ -61,9 +61,9 @@ router.get("/:id/items", locations.getItems);
 router.get("/:id/items/:itemId", locations.getItem);
 
 /**
- * PUT /api/v1/locations/{id}/items/{itemId}
+ * PATCH /api/v1/locations/{id}/items/{itemId}
  */
-router.put("/:id/items/:itemId", locations.updateItem);
+router.patch("/:id/items/:itemId", locations.updateItem);
 
 /**
  * DELETE /api/v1/locations/{id}/items/{itemId}
