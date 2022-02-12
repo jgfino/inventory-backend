@@ -1,6 +1,6 @@
 # inventory-backend
 
-This is the backend API for the Inventory Management application that I am currently working on. It is very much a work in progress, and I will update this README as progress is made. The current (work in progress) API documentation can be found [HERE](https://jgfino.github.io/inventory-backend/)
+This is the backend API for the Inventory Management application that I am currently working on. It is very much a work in progress, and I will update this README as progress is made. The current (work in progress) API documentation (OpenApi/Swagger) can be found [HERE](https://jgfino.github.io/inventory-backend/)
 
 ## Tech Stack
 * Node.js
